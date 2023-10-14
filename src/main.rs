@@ -9,7 +9,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode, Uri,
 };
-use std::{io::Write, net::SocketAddr};
+use std::{io::Write, net::SocketAddr, time::Duration};
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
 use once_cell::sync::OnceCell;
@@ -60,6 +60,7 @@ async fn main_(listen: SocketAddr, outbound: Box<dyn ProxyOutBound>) {
     Server::try_bind(&listen)
         .unwrap()
         .http1_only(true)
+        .http1_header_read_timeout(Duration::from_secs(15))
         .tcp_nodelay(true)
         .serve(make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(handle))
