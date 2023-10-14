@@ -1,7 +1,10 @@
-use crate::{utils, Connection, Error, PROXY};
+use crate::{
+    utils::{self, UnSplit},
+    Error, PROXY,
+};
 
 use hyper::{Body, Request, Response};
-use tokio::io::BufReader;
+use tokio::io::{AsyncBufRead, AsyncWrite, BufReader};
 
 pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
     let proxy = PROXY.get().ok_or("")?;
@@ -15,30 +18,20 @@ pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
     let server_port: u16 = server[1].parse()?;
 
     let server_conn = proxy.outbound.connect(server_host, server_port).await?;
-
-    tokio::spawn(async move {
-        let _ = tunnel(request, server_conn).await;
-    });
+    tokio::spawn(tunnel(request, server_conn));
 
     Ok(Response::new(Body::empty()))
 }
 
-async fn tunnel(request: Request<Body>, server: Connection) -> Result<(), Error> {
-    let server = server.split();
+async fn tunnel<R, W>(request: Request<Body>, server: UnSplit<R, W>) -> Result<(), Error>
+where
+    R: AsyncBufRead + Unpin + Send + 'static,
+    W: AsyncWrite + Unpin + Send + 'static,
+{
     let client = hyper::upgrade::on(request).await?;
     let client = tokio::io::split(client);
+    let client = unsafe { UnSplit::new(BufReader::new(client.0), client.1) };
 
-    let client_to_server = tokio::spawn(async {
-        let _ = utils::copy(BufReader::new(client.0), server.1).await;
-    });
-    let server_to_client = tokio::spawn(async {
-        let _ = utils::copy(server.0, client.1).await;
-    });
-
-    tokio::select! {
-        _ = client_to_server => {}
-        _ = server_to_client => {}
-    }
-
+    utils::copy_bidirectional(client, server).await;
     Ok(())
 }

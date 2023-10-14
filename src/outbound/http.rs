@@ -1,9 +1,12 @@
 use super::ProxyOutBound;
-use crate::{utils::UnSplit, Error};
+use crate::{
+    utils::{ParsedUri, UnSplit},
+    Error,
+};
 
 use base64::Engine;
-use hyper::Response;
-use std::net::SocketAddr;
+use hyper::{Response, Uri};
+use std::net::{SocketAddr, ToSocketAddrs};
 use tokio::{
     io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader},
     net::TcpStream,
@@ -18,18 +21,25 @@ pub struct HttpProxy {
 }
 
 impl HttpProxy {
-    pub fn new(addr: SocketAddr, user: Option<&str>, pass: Option<&str>) -> Self {
+    pub fn new(uri: Uri) -> Result<Self, Error> {
+        let uri: ParsedUri = uri.try_into()?;
+
+        let addr = format!("{}:{}", uri.host().ok_or("")?, uri.port.ok_or("")?)
+            .to_socket_addrs()?
+            .next()
+            .ok_or("")?;
+
         let mut auth = None;
-        if let Some(user) = user {
+        if let Some(user) = uri.user() {
             let base64 = base64::engine::general_purpose::STANDARD;
-            if let Some(pass) = pass {
-                auth = Some(base64.encode(format!("{}:{}", user, pass)));
+            if let Some(password) = uri.password() {
+                auth = Some(base64.encode(format!("{}:{}", user, password)));
             } else {
                 auth = Some(base64.encode(format!("{}:", user)))
             }
         }
 
-        HttpProxy { addr, auth }
+        Ok(HttpProxy { addr, auth })
     }
 }
 

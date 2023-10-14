@@ -1,4 +1,5 @@
 mod connect;
+mod http_proxy;
 mod outbound;
 mod utils;
 
@@ -8,10 +9,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode, Uri,
 };
-use std::{
-    io::Write,
-    net::{SocketAddr, ToSocketAddrs},
-};
+use std::{io::Write, net::SocketAddr};
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
 use once_cell::sync::OnceCell;
@@ -49,27 +47,8 @@ async fn main() {
         let proxy: Uri = proxy.parse().unwrap();
         let proxy_protocol = proxy.scheme_str().unwrap();
 
-        let proxy_host = proxy.host().unwrap();
-        let proxy_port = proxy.port_u16().ok_or("").unwrap();
-        let proxy_addr = format!("{}:{}", proxy_host, proxy_port)
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .unwrap();
-
-        let proxy_auth_: Vec<&str> = proxy.authority().unwrap().as_str().split('@').collect();
-        let mut proxy_auth = (None, None);
-        if proxy_auth_.len() == 2 {
-            let proxy_auth_: Vec<&str> = proxy_auth_[0].split(':').collect();
-            if proxy_auth_.len() == 1 {
-                proxy_auth = (Some(proxy_auth_[0]), None);
-            } else if proxy_auth_.len() == 2 {
-                proxy_auth = (Some(proxy_auth_[0]), Some(proxy_auth_[1]));
-            }
-        }
-
         if proxy_protocol == "http" {
-            let proxy = outbound::HttpProxy::new(proxy_addr, proxy_auth.0, proxy_auth.1);
+            let proxy = outbound::HttpProxy::new(proxy).unwrap();
             main_(listen, Box::new(proxy)).await;
         }
     }
@@ -97,8 +76,7 @@ async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {
             .status(StatusCode::METHOD_NOT_ALLOWED)
             .body(Body::empty())?)
     } else {
-        let proxy = PROXY.get().ok_or("")?;
-        proxy.outbound.http_proxy(request).await
+        http_proxy::run(request).await
     }
 }
 

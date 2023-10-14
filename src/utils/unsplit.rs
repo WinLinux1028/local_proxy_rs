@@ -3,13 +3,13 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
 pub struct UnSplit<R, W>(R, W)
 where
-    R: AsyncRead + Unpin + Sync + Send,
-    W: AsyncWrite + Unpin + Sync + Send;
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin;
 
 impl<R, W> UnSplit<R, W>
 where
-    R: AsyncRead + Unpin + Sync + Send,
-    W: AsyncWrite + Unpin + Sync + Send,
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
 {
     pub unsafe fn new(read: R, write: W) -> Self {
         Self(read, write)
@@ -22,8 +22,8 @@ where
 
 impl<R, W> AsyncRead for UnSplit<R, W>
 where
-    R: AsyncRead + Unpin + Sync + Send,
-    W: AsyncWrite + Unpin + Sync + Send,
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
 {
     fn poll_read(
         mut self: std::pin::Pin<&mut Self>,
@@ -36,8 +36,8 @@ where
 
 impl<R, W> AsyncBufRead for UnSplit<R, W>
 where
-    R: AsyncRead + AsyncBufRead + Unpin + Sync + Send,
-    W: AsyncWrite + Unpin + Sync + Send,
+    R: AsyncBufRead + Unpin,
+    W: AsyncWrite + Unpin,
 {
     fn poll_fill_buf(
         mut self: std::pin::Pin<&mut Self>,
@@ -53,8 +53,8 @@ where
 
 impl<R, W> AsyncWrite for UnSplit<R, W>
 where
-    R: AsyncRead + Unpin + Sync + Send,
-    W: AsyncWrite + Unpin + Sync + Send,
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
 {
     fn poll_write(
         mut self: std::pin::Pin<&mut Self>,
