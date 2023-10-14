@@ -5,7 +5,6 @@ use hyper::{Body, Request, Response};
 
 pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
     let mut uri: ParsedUri = request.uri().clone().try_into()?;
-    let mut new_uri = uri.clone();
 
     if let Some(scheme) = uri.scheme() {
         match scheme {
@@ -38,9 +37,9 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
             .ok_or("")?
             .to_str()?
             .split(':');
-        new_uri.host = Some(host.next().ok_or("")?.to_string());
+        uri.host = Some(host.next().ok_or("")?.to_string());
         if let Some(port) = host.next() {
-            new_uri.port = Some(port.parse()?);
+            uri.port = Some(port.parse()?);
         }
     }
 
