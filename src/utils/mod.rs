@@ -1,12 +1,14 @@
 mod unsplit;
 mod uri_parse;
 
-pub use unsplit::UnSplit;
-pub use uri_parse::ParsedUri;
-
 use crate::Error;
 
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
+use std::sync::Arc;
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio_rustls::{client::TlsStream, rustls};
+
+pub use unsplit::UnSplit;
+pub use uri_parse::ParsedUri;
 
 pub async fn copy<R, W>(mut read: R, mut write: W) -> Result<(), Error>
 where
@@ -49,4 +51,22 @@ where
         _ = a_to_b => {}
         _ = b_to_a => {}
     }
+}
+
+pub async fn tls_connect<RW>(stream: RW, hostname: &str) -> Result<TlsStream<RW>, Error>
+where
+    RW: AsyncRead + AsyncWrite + Unpin,
+{
+    let mut certs = rustls::RootCertStore::empty();
+    for cert in rustls_native_certs::load_native_certs()? {
+        certs.add(&rustls::Certificate(cert.0))?;
+    }
+
+    let config = rustls::ClientConfig::builder()
+        .with_safe_defaults()
+        .with_root_certificates(certs)
+        .with_no_client_auth();
+    let config = tokio_rustls::TlsConnector::from(Arc::new(config));
+
+    Ok(config.connect(hostname.try_into()?, stream).await?)
 }

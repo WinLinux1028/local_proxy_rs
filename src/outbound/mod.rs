@@ -43,6 +43,7 @@ pub trait ProxyOutBound: std::fmt::Debug + Unpin + Sync + Send {
             tokio::spawn(conn);
             sender = sender_;
         } else if scheme == "https" {
+            let server = utils::tls_connect(server, addr).await?;
             let (sender_, conn) = hyper::client::conn::handshake(server).await?;
             tokio::spawn(conn);
             sender = sender_;
