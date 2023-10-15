@@ -46,7 +46,9 @@ impl HttpProxy {
 #[async_trait]
 impl ProxyOutBound for HttpProxy {
     async fn connect(&self, addr: &str, port: u16) -> Result<Connection, Error> {
-        let server = tokio::io::split(TcpStream::connect(&self.addr).await?);
+        let server = TcpStream::connect(&self.addr).await?;
+        server.set_nodelay(true)?;
+        let server = tokio::io::split(server);
         let mut server = (BufReader::new(server.0), server.1);
 
         server
@@ -90,6 +92,7 @@ impl ProxyOutBound for HttpProxy {
         mut request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
         let server = TcpStream::connect(&self.addr).await?;
+        server.set_nodelay(true)?;
         let (mut sender, conn) = hyper::client::conn::handshake(server).await?;
         tokio::spawn(conn);
 
