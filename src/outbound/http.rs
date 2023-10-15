@@ -5,7 +5,7 @@ use crate::{
 };
 
 use base64::Engine;
-use hyper::{Response, Uri};
+use hyper::{Body, Request, Response, StatusCode, Uri};
 use std::net::{SocketAddr, ToSocketAddrs};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
@@ -59,10 +59,10 @@ impl ProxyOutBound for HttpProxy {
                 .as_bytes(),
             )
             .await?;
-        if let Some(s) = &self.auth {
+        if let Some(auth) = &self.auth {
             server
                 .1
-                .write_all(format!("Proxy-Authorization: Basic {}\r\n", s).as_bytes())
+                .write_all(format!("Proxy-Authorization: Basic {}\r\n", auth).as_bytes())
                 .await?;
         }
         server.1.write_all(b"\r\n").await?;
@@ -80,5 +80,42 @@ impl ProxyOutBound for HttpProxy {
         }
 
         Ok(unsafe { UnSplit::new(Box::new(server.0), Box::new(server.1)) })
+    }
+
+    async fn http_proxy(
+        &self,
+        scheme: &str,
+        _: &str,
+        _: u16,
+        mut request: Request<Body>,
+    ) -> Result<Response<Body>, Error> {
+        let server = TcpStream::connect(&self.addr).await?;
+        let (mut sender, conn) = hyper::client::conn::handshake(server).await?;
+        tokio::spawn(conn);
+
+        let uri = Uri::builder()
+            .scheme(scheme)
+            .authority(request.headers().get("host").ok_or("")?.to_str()?)
+            .path_and_query(request.uri().path_and_query().ok_or("")?.as_str())
+            .build()?;
+
+        *request.uri_mut() = uri;
+        request
+            .headers_mut()
+            .insert("proxy-connection", "keep-alive".parse()?);
+        if let Some(auth) = &self.auth {
+            request
+                .headers_mut()
+                .insert("proxy-authorization", format!("basic {}", auth).parse()?);
+        }
+
+        let client = hyper::upgrade::on(&mut request);
+        let mut response = sender.send_request(request).await?;
+        let server = hyper::upgrade::on(&mut response);
+        if response.status() == StatusCode::SWITCHING_PROTOCOLS {
+            tokio::spawn(super::proxy_upgrade(client, server));
+        }
+
+        Ok(response)
     }
 }
