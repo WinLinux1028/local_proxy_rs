@@ -15,9 +15,8 @@ use tokio::io::{AsyncBufRead, AsyncWrite};
 use once_cell::sync::OnceCell;
 
 static PROXY: OnceCell<ProxyState> = OnceCell::new();
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Connection =
-    UnSplit<Box<dyn AsyncBufRead + Unpin + Sync + Send>, Box<dyn AsyncWrite + Unpin + Sync + Send>>;
+type Error = Box<dyn std::error::Error + Sync + Send>;
+type Connection = UnSplit<Box<dyn AsyncBufRead + Unpin + Send>, Box<dyn AsyncWrite + Unpin + Send>>;
 
 #[tokio::main]
 async fn main() {

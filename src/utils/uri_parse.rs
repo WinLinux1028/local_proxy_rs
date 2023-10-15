@@ -44,36 +44,57 @@ impl TryFrom<Uri> for ParsedUri {
         let mut password = None;
         let mut host = None;
         let mut port = None;
+        let mut path = value.path();
+
+        if let Some(scheme_) = value.scheme_str() {
+            scheme = Some(scheme_);
+        }
 
         if let Some(authority) = value.authority() {
-            if let Some(scheme_) = value.scheme_str() {
-                scheme = Some(scheme_.to_string());
-                host = Some(authority.host().to_string());
-                port = authority.port_u16();
+            host = Some(authority.host());
+            port = authority.port_u16();
 
-                let auth: Vec<&str> = authority.as_str().split('@').collect();
-                if auth.len() == 2 {
-                    let mut auth = auth[0].split(':');
-                    user = auth.next().map(|u| u.to_string());
-                    password = auth.next().map(|p| p.to_string());
+            let auth: Vec<&str> = authority.as_str().split('@').collect();
+            if auth.len() == 2 {
+                let mut auth = auth[0].split(':');
+                user = auth.next();
+                password = auth.next();
 
-                    if auth.next().is_some() {
-                        return Err("".into());
-                    }
-                } else if auth.len() != 1 {
+                if auth.next().is_some() {
                     return Err("".into());
                 }
+            } else if auth.len() != 1 {
+                return Err("".into());
             }
         }
 
+        if scheme.is_some() && host.is_none() {
+            return Err("".into());
+        }
+        if scheme.is_none() {
+            if user.is_some() {
+                return Err("".into());
+            }
+            if host.is_some() && (port.is_none() || (!path.is_empty()) || value.query().is_some()) {
+                return Err("".into());
+            }
+            if host.is_none() && (path.is_empty()) {
+                return Err("".into());
+            }
+        }
+
+        if path.is_empty() {
+            path = "/";
+        }
+
         Ok(ParsedUri {
-            scheme,
-            user,
-            password,
-            host,
+            scheme: scheme.map(|s| s.to_string()),
+            user: user.map(|u| u.to_string()),
+            password: password.map(|p| p.to_string()),
+            host: host.map(|h| h.to_string()),
             port,
-            path: value.path().to_string(),
-            query: value.query().map(|v| v.to_string()),
+            path: path.to_string(),
+            query: value.query().map(|q| q.to_string()),
         })
     }
 }

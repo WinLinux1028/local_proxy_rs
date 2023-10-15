@@ -1,14 +1,14 @@
 use super::ProxyOutBound;
 use crate::{
     utils::{ParsedUri, UnSplit},
-    Error,
+    Connection, Error,
 };
 
 use base64::Engine;
 use hyper::{Response, Uri};
 use std::net::{SocketAddr, ToSocketAddrs};
 use tokio::{
-    io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpStream,
 };
 
@@ -45,17 +45,7 @@ impl HttpProxy {
 
 #[async_trait]
 impl ProxyOutBound for HttpProxy {
-    async fn connect(
-        &self,
-        addr: &str,
-        port: u16,
-    ) -> Result<
-        UnSplit<
-            Box<dyn AsyncBufRead + Unpin + Sync + Send>,
-            Box<dyn AsyncWrite + Unpin + Sync + Send>,
-        >,
-        Error,
-    > {
+    async fn connect(&self, addr: &str, port: u16) -> Result<Connection, Error> {
         let server = tokio::io::split(TcpStream::connect(&self.addr).await?);
         let mut server = (BufReader::new(server.0), server.1);
 

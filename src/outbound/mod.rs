@@ -6,27 +6,17 @@ pub use raw::Raw;
 
 use crate::{
     utils::{self, UnSplit},
-    Error,
+    Connection, Error,
 };
 
 use hyper::{upgrade::OnUpgrade, Body, Request, Response, StatusCode};
-use tokio::io::{AsyncBufRead, AsyncWrite, BufReader};
+use tokio::io::BufReader;
 
 use async_trait::async_trait;
 
 #[async_trait]
 pub trait ProxyOutBound: std::fmt::Debug + Unpin + Sync + Send {
-    async fn connect(
-        &self,
-        addr: &str,
-        port: u16,
-    ) -> Result<
-        UnSplit<
-            Box<dyn AsyncBufRead + Unpin + Sync + Send>,
-            Box<dyn AsyncWrite + Unpin + Sync + Send>,
-        >,
-        Error,
-    >;
+    async fn connect(&self, addr: &str, port: u16) -> Result<Connection, Error>;
 
     async fn http_proxy(
         &self,
