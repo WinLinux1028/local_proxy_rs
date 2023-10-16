@@ -43,6 +43,7 @@ pub trait ProxyOutBound: std::fmt::Debug + Unpin + Sync + Send {
 
         let client = hyper::upgrade::on(&mut request);
         let mut response = sender.send_request(request).await?;
+        response.headers_mut().remove("keep-alive");
         let server = hyper::upgrade::on(&mut response);
         if response.status() == StatusCode::SWITCHING_PROTOCOLS {
             tokio::spawn(proxy_upgrade(client, server));
