@@ -43,21 +43,23 @@ async fn main() {
 
     let proxy = buf.trim();
 
+    let outbound: Box<dyn ProxyOutBound>;
     if proxy.is_empty() {
-        main_(listen, Box::new(outbound::Raw::new())).await;
+        outbound = Box::new(outbound::Raw::new());
     } else {
         let proxy: Uri = proxy.parse().unwrap();
         let proxy_protocol = proxy.scheme_str().unwrap();
 
         if proxy_protocol == "http" {
-            let proxy = outbound::HttpProxy::new(proxy).unwrap();
-            main_(listen, Box::new(proxy)).await;
+            outbound = Box::new(outbound::HttpProxy::new(proxy).unwrap());
+        } else {
+            panic!("This protocol can not use.");
         }
     }
-}
 
-async fn main_(listen: SocketAddr, outbound: Box<dyn ProxyOutBound>) {
-    PROXY.set(ProxyState { outbound }).unwrap();
+    if PROXY.set(ProxyState { outbound }).is_err() {
+        panic!("Could not set to OnceCell");
+    }
 
     Server::try_bind(&listen)
         .unwrap()
@@ -83,7 +85,6 @@ async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {
     }
 }
 
-#[derive(Debug)]
 struct ProxyState {
     outbound: Box<dyn ProxyOutBound>,
 }

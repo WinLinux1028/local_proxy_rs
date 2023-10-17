@@ -15,7 +15,7 @@ use tokio::io::BufReader;
 use async_trait::async_trait;
 
 #[async_trait]
-pub trait ProxyOutBound: std::fmt::Debug + Unpin + Sync + Send {
+pub trait ProxyOutBound: Unpin + Sync + Send {
     async fn connect(&self, addr: &str, port: u16) -> Result<Connection, Error>;
 
     async fn http_proxy(

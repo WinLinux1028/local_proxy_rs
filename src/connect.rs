@@ -7,8 +7,6 @@ use hyper::{Body, Request, Response};
 use tokio::io::{AsyncBufRead, AsyncWrite, BufReader};
 
 pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
-    let proxy = PROXY.get().ok_or("")?;
-
     let server = request.uri().to_string();
     let server: Vec<&str> = server.split(':').collect();
     if server.len() != 2 {
@@ -17,6 +15,7 @@ pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
     let server_host = server[0];
     let server_port: u16 = server[1].parse()?;
 
+    let proxy = PROXY.get().ok_or("")?;
     let server_conn = proxy.outbound.connect(server_host, server_port).await?;
     tokio::spawn(tunnel(request, server_conn));
 
