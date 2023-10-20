@@ -1,8 +1,10 @@
 mod http;
 mod raw;
+mod socks4;
 
 pub use http::HttpProxy;
 pub use raw::Raw;
+pub use socks4::Socks4Proxy;
 
 use crate::{
     utils::{self, UnSplit},

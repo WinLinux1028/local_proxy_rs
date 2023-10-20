@@ -14,7 +14,6 @@ use tokio::{
 
 use async_trait::async_trait;
 
-#[derive(Debug)]
 pub struct HttpProxy {
     addr: SocketAddr,
     auth: Option<String>,

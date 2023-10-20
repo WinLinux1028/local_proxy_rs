@@ -5,7 +5,6 @@ use tokio::{io::BufReader, net::TcpStream};
 
 use async_trait::async_trait;
 
-#[derive(Debug)]
 pub struct Raw();
 
 impl Raw {
