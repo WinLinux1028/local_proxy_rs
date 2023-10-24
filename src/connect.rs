@@ -12,11 +12,11 @@ pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
     if server.len() != 2 {
         return Err("".into());
     }
-    let server_host = server[0];
+    let server_hostname = server[0];
     let server_port: u16 = server[1].parse()?;
 
     let proxy = PROXY.get().ok_or("")?;
-    let server_conn = proxy.outbound.connect(server_host, server_port).await?;
+    let server_conn = proxy.outbound.connect(server_hostname, server_port).await?;
     tokio::spawn(tunnel(request, server_conn));
 
     Ok(Response::new(Body::empty()))

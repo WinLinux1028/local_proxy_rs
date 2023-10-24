@@ -50,7 +50,7 @@ async fn main() {
         let proxy: Uri = proxy.parse().unwrap();
         let proxy_protocol = proxy.scheme_str().unwrap();
 
-        if proxy_protocol == "http" {
+        if proxy_protocol.ends_with("+http") {
             outbound = Box::new(outbound::HttpProxy::new(proxy).unwrap());
         } else {
             panic!("This protocol can not use.");

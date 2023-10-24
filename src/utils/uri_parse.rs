@@ -7,7 +7,7 @@ pub struct ParsedUri {
     pub scheme: Option<String>,
     pub user: Option<String>,
     pub password: Option<String>,
-    pub host: Option<String>,
+    pub hostname: Option<String>,
     pub port: Option<u16>,
     pub path: String,
     pub query: Option<String>,
@@ -24,8 +24,8 @@ impl ParsedUri {
     pub fn password(&self) -> Option<&str> {
         self.password.as_deref()
     }
-    pub fn host(&self) -> Option<&str> {
-        self.host.as_deref()
+    pub fn hostname(&self) -> Option<&str> {
+        self.hostname.as_deref()
     }
     pub fn path(&self) -> &str {
         &self.path
@@ -42,7 +42,7 @@ impl TryFrom<Uri> for ParsedUri {
         let mut scheme = None;
         let mut user = None;
         let mut password = None;
-        let mut host = None;
+        let mut hostname = None;
         let mut port = None;
         let mut path = value.path();
 
@@ -51,7 +51,7 @@ impl TryFrom<Uri> for ParsedUri {
         }
 
         if let Some(authority) = value.authority() {
-            host = Some(authority.host());
+            hostname = Some(authority.host());
             port = authority.port_u16();
 
             let auth: Vec<&str> = authority.as_str().split('@').collect();
@@ -68,17 +68,19 @@ impl TryFrom<Uri> for ParsedUri {
             }
         }
 
-        if scheme.is_some() && host.is_none() {
+        if scheme.is_some() && hostname.is_none() {
             return Err("".into());
         }
         if scheme.is_none() {
             if user.is_some() {
                 return Err("".into());
             }
-            if host.is_some() && (port.is_none() || (!path.is_empty()) || value.query().is_some()) {
+            if hostname.is_some()
+                && (port.is_none() || (!path.is_empty()) || value.query().is_some())
+            {
                 return Err("".into());
             }
-            if host.is_none() && (path.is_empty()) {
+            if hostname.is_none() && (path.is_empty()) {
                 return Err("".into());
             }
         }
@@ -91,7 +93,7 @@ impl TryFrom<Uri> for ParsedUri {
             scheme: scheme.map(|s| s.to_string()),
             user: user.map(|u| u.to_string()),
             password: password.map(|p| p.to_string()),
-            host: host.map(|h| h.to_string()),
+            hostname: hostname.map(|h| h.to_string()),
             port,
             path: path.to_string(),
             query: value.query().map(|q| q.to_string()),
@@ -117,8 +119,8 @@ impl TryInto<Uri> for ParsedUri {
             }
             authority.push('@');
         }
-        if let Some(host) = self.host {
-            authority.push_str(&host);
+        if let Some(hostname) = self.hostname {
+            authority.push_str(&hostname);
             if let Some(port) = self.port {
                 authority.push(':');
                 authority.push_str(&port.to_string());

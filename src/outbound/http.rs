@@ -1,6 +1,6 @@
 use super::ProxyOutBound;
 use crate::{
-    utils::{ParsedUri, UnSplit},
+    utils::{self, ParsedUri, UnSplit},
     Connection, Error,
 };
 
@@ -16,14 +16,16 @@ use async_trait::async_trait;
 
 pub struct HttpProxy {
     addr: SocketAddr,
+    hostname: String,
     auth: Option<String>,
+    tls: bool,
 }
 
 impl HttpProxy {
     pub fn new(uri: Uri) -> Result<Self, Error> {
         let uri: ParsedUri = uri.try_into()?;
 
-        let addr = format!("{}:{}", uri.host().ok_or("")?, uri.port.ok_or("")?)
+        let addr = format!("{}:{}", uri.hostname().ok_or("")?, uri.port.ok_or("")?)
             .to_socket_addrs()?
             .next()
             .ok_or("")?;
@@ -38,40 +40,55 @@ impl HttpProxy {
             }
         }
 
-        Ok(HttpProxy { addr, auth })
+        Ok(HttpProxy {
+            addr,
+            hostname: uri.hostname().ok_or("")?.to_string(),
+            auth,
+            tls: uri.scheme().ok_or("")?.starts_with("tls+"),
+        })
+    }
+
+    async fn connect_to_proxy_server(&self) -> Result<Connection, Error> {
+        let server = TcpStream::connect(&self.addr).await?;
+        server.set_nodelay(true)?;
+        if self.tls {
+            let server = utils::tls_connect(server, &self.hostname).await?;
+            let server = tokio::io::split(server);
+            let server = (BufReader::new(server.0), server.1);
+            Ok(unsafe { UnSplit::new(Box::new(server.0), Box::new(server.1)) })
+        } else {
+            let server = tokio::io::split(server);
+            let server = (BufReader::new(server.0), server.1);
+            Ok(unsafe { UnSplit::new(Box::new(server.0), Box::new(server.1)) })
+        }
     }
 }
 
 #[async_trait]
 impl ProxyOutBound for HttpProxy {
-    async fn connect(&self, addr: &str, port: u16) -> Result<Connection, Error> {
-        let server = TcpStream::connect(&self.addr).await?;
-        server.set_nodelay(true)?;
-        let server = tokio::io::split(server);
-        let mut server = (BufReader::new(server.0), server.1);
+    async fn connect(&self, hostname: &str, port: u16) -> Result<Connection, Error> {
+        let mut server = self.connect_to_proxy_server().await?;
 
         server
-            .1
             .write_all(
                 format!(
                     "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\nProxy-Connection: Keep-Alive\r\n",
-                    addr, port
+                    hostname, port
                 )
                 .as_bytes(),
             )
             .await?;
         if let Some(auth) = &self.auth {
             server
-                .1
                 .write_all(format!("Proxy-Authorization: Basic {}\r\n", auth).as_bytes())
                 .await?;
         }
-        server.1.write_all(b"\r\n").await?;
-        server.1.flush().await?;
+        server.write_all(b"\r\n").await?;
+        server.flush().await?;
 
         let mut response = String::new();
         while !response.ends_with("\r\n\r\n") {
-            if server.0.read_line(&mut response).await? == 0 {
+            if server.read_line(&mut response).await? == 0 {
                 return Err("".into());
             }
         }
@@ -80,7 +97,7 @@ impl ProxyOutBound for HttpProxy {
             return Err("".into());
         }
 
-        Ok(unsafe { UnSplit::new(Box::new(server.0), Box::new(server.1)) })
+        Ok(server)
     }
 
     async fn http_proxy(
@@ -90,8 +107,7 @@ impl ProxyOutBound for HttpProxy {
         _: u16,
         mut request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
-        let server = TcpStream::connect(&self.addr).await?;
-        server.set_nodelay(true)?;
+        let server = self.connect_to_proxy_server().await?;
         let (mut sender, conn) = hyper::client::conn::handshake(server).await?;
         tokio::spawn(conn);
 

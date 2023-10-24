@@ -37,7 +37,7 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
             .ok_or("")?
             .to_str()?
             .split(':');
-        uri.host = Some(host.next().ok_or("")?.to_string());
+        uri.hostname = Some(host.next().ok_or("")?.to_string());
         if let Some(port) = host.next() {
             uri.port = Some(port.parse()?);
         }
@@ -56,9 +56,9 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
     }
 
     let scheme = uri.scheme().ok_or("")?.to_string();
-    let host = uri.host().ok_or("")?.to_string();
+    let hostname = uri.hostname().ok_or("")?.to_string();
     let port;
-    let mut host_header = host.clone();
+    let mut host_header = hostname.clone();
     if let Some(port_) = uri.port {
         port = port_;
         if (scheme == "http" && port == 80) || (scheme == "https" && port == 443) {
@@ -79,7 +79,7 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
     uri.scheme = None;
     uri.user = None;
     uri.password = None;
-    uri.host = None;
+    uri.hostname = None;
     uri.port = None;
 
     *request.uri_mut() = uri.try_into()?;
@@ -87,6 +87,6 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
     let proxy = PROXY.get().ok_or("")?;
     proxy
         .outbound
-        .http_proxy(&scheme, &host, port, request)
+        .http_proxy(&scheme, &hostname, port, request)
         .await
 }
