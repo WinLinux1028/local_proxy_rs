@@ -1,18 +1,19 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+mod config;
 mod connect;
 mod http_proxy;
 mod outbound;
 mod utils;
 
-use crate::{outbound::ProxyOutBound, utils::UnSplit};
+use crate::{config::Config, outbound::ProxyOutBound, utils::UnSplit};
 
 use hyper::{
     service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, Server, StatusCode, Uri,
+    Body, Method, Request, Response, Server, StatusCode,
 };
-use std::{io::Write, net::SocketAddr, time::Duration};
+use std::{io::Write, time::Duration};
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
 use once_cell::sync::OnceCell;
@@ -23,31 +24,35 @@ type Connection = UnSplit<Box<dyn AsyncBufRead + Unpin + Send>, Box<dyn AsyncWri
 
 #[tokio::main]
 async fn main() {
-    let stdin = std::io::stdin();
-    let mut stdout = std::io::stdout();
-    let mut buf = String::new();
-
-    write!(&mut stdout, "listen(like 127.0.0.1:8080)> ").unwrap();
-    stdout.flush().unwrap();
-    stdin.read_line(&mut buf).unwrap();
-    let listen: SocketAddr = buf.trim().parse().unwrap();
-    buf.clear();
-
-    write!(
-        &mut stdout,
-        "http proxy(like http://user:password@example.com:8080)> "
-    )
-    .unwrap();
-    stdout.flush().unwrap();
-    stdin.read_line(&mut buf).unwrap();
-
-    let proxy = buf.trim();
+    let config: Config =
+        serde_json::from_reader(std::fs::File::open("./config.json").unwrap()).unwrap();
 
     let outbound: Box<dyn ProxyOutBound>;
-    if proxy.is_empty() {
-        outbound = Box::new(outbound::Raw::new());
-    } else {
-        let proxy: Uri = proxy.parse().unwrap();
+    if let Some(proxy) = &config.proxy {
+        let stdin = std::io::stdin();
+        let mut stdout = std::io::stdout();
+
+        write!(&mut stdout, "user> ").unwrap();
+        stdout.flush().unwrap();
+        let mut user = String::new();
+        stdin.read_line(&mut user).unwrap();
+        let user = if user.is_empty() {
+            None
+        } else {
+            Some(user.trim())
+        };
+
+        write!(&mut stdout, "password> ").unwrap();
+        stdout.flush().unwrap();
+        let mut password = String::new();
+        stdin.read_line(&mut password).unwrap();
+        let password = if password.is_empty() {
+            None
+        } else {
+            Some(password.trim())
+        };
+
+        let proxy = proxy.to_uri(user, password).unwrap();
         let proxy_protocol = proxy.scheme_str().unwrap();
 
         if proxy_protocol == "http" || proxy_protocol == "tls+http" {
@@ -55,13 +60,15 @@ async fn main() {
         } else {
             panic!("This protocol can not use.");
         }
+    } else {
+        outbound = Box::new(outbound::Raw::new());
     }
 
     if PROXY.set(ProxyState { outbound }).is_err() {
         panic!("Could not set to OnceCell");
     }
 
-    Server::try_bind(&listen)
+    Server::try_bind(&config.listen)
         .unwrap()
         .http1_only(true)
         .http1_header_read_timeout(Duration::from_secs(15))
