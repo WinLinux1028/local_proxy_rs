@@ -1,5 +1,5 @@
 use crate::{
-    utils::{self, UnSplit},
+    utils::{self, ParsedUri, UnSplit},
     Error, PROXY,
 };
 
@@ -7,24 +7,26 @@ use hyper::{Body, Request, Response};
 use tokio::io::{AsyncBufRead, AsyncWrite, BufReader};
 
 pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
-    let server = request.uri().to_string();
-    let server: Vec<&str> = server.split(':').collect();
-    if server.len() != 2 {
-        return Err("".into());
-    }
-    let server_hostname = server[0];
-    let server_port: u16 = server[1].parse()?;
+    let server: ParsedUri = request.uri().clone().try_into()?;
 
-    let server_ips = utils::dns_resolve(server_hostname).await;
+    let server_hostname = server.hostname().ok_or("")?;
+    let server_port = server.port.ok_or("")?;
 
     let proxy = PROXY.get().ok_or("")?;
+
+    let mut server_conn = None;
     //todo
 
-    let server_conn = proxy
-        .outbound
-        .connect(server_hostname.to_string(), server_port)
-        .await?;
-    tokio::spawn(tunnel(request, server_conn));
+    if server_conn.is_none() {
+        server_conn = Some(
+            proxy
+                .outbound
+                .connect(server_hostname.to_string(), server_port)
+                .await?,
+        );
+    }
+
+    tokio::spawn(tunnel(request, server_conn.ok_or("")?));
     Ok(Response::new(Body::empty()))
 }
 

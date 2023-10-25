@@ -8,37 +8,16 @@ use dns_message_parser::{
 use hyper::{body::HttpBody, Body, Method, Request, Uri};
 use std::{net::IpAddr, str::FromStr};
 
-pub async fn dns_resolve(domain: &str) -> Vec<IpAddr> {
+pub async fn dns_resolve(q_type: QType, domain: &str) -> Result<IpAddr, Error> {
     if let Ok(addr) = IpAddr::from_str(domain) {
-        return vec![addr];
+        return Ok(addr);
     }
 
-    let v6 = Question {
-        domain_name: domain.parse().unwrap(),
+    let query = Question {
+        domain_name: domain.parse()?,
         q_class: QClass::IN,
-        q_type: QType::AAAA,
+        q_type,
     };
-    let v6 = request(&v6).await;
-
-    let v4 = Question {
-        domain_name: domain.parse().unwrap(),
-        q_class: QClass::IN,
-        q_type: QType::A,
-    };
-    let v4 = request(&v4).await;
-
-    let mut result = Vec::new();
-    if let Ok(v6) = v6 {
-        result.push(v6);
-    }
-    if let Ok(v4) = v4 {
-        result.push(v4);
-    }
-
-    result
-}
-
-async fn request(query: &Question) -> Result<IpAddr, Error> {
     let query: [Result<_, Error>; 1] = [Ok(query.encode()?)];
     let query = futures_util::stream::iter(query);
 
