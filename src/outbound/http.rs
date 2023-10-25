@@ -66,7 +66,7 @@ impl HttpProxy {
 
 #[async_trait]
 impl ProxyOutBound for HttpProxy {
-    async fn connect(&self, hostname: &str, port: u16) -> Result<Connection, Error> {
+    async fn connect(&self, hostname: String, port: u16) -> Result<Connection, Error> {
         let mut server = self.connect_to_proxy_server().await?;
 
         server
@@ -102,17 +102,21 @@ impl ProxyOutBound for HttpProxy {
 
     async fn http_proxy(
         &self,
-        scheme: &str,
-        _: &str,
-        _: u16,
+        scheme: String,
+        hostname: String,
+        port: u16,
         mut request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
+        if scheme != "http" {
+            return ProxyOutBound::http_proxy(self, scheme, hostname, port, request).await;
+        }
+
         let server = self.connect_to_proxy_server().await?;
         let (mut sender, conn) = hyper::client::conn::handshake(server).await?;
         tokio::spawn(conn);
 
         let uri = Uri::builder()
-            .scheme(scheme)
+            .scheme(scheme.as_str())
             .authority(request.headers().get("host").ok_or("")?.to_str()?)
             .path_and_query(request.uri().path_and_query().ok_or("")?.as_str())
             .build()?;

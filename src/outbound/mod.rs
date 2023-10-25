@@ -18,16 +18,16 @@ use async_trait::async_trait;
 
 #[async_trait]
 pub trait ProxyOutBound: Unpin + Sync + Send {
-    async fn connect(&self, hostname: &str, port: u16) -> Result<Connection, Error>;
+    async fn connect(&self, hostname: String, port: u16) -> Result<Connection, Error>;
 
     async fn http_proxy(
         &self,
-        scheme: &str,
-        hostname: &str,
+        scheme: String,
+        hostname: String,
         port: u16,
         mut request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
-        let server = self.connect(hostname, port).await?;
+        let server = self.connect(hostname.clone(), port).await?;
 
         let mut sender;
         if scheme == "http" {
@@ -35,7 +35,7 @@ pub trait ProxyOutBound: Unpin + Sync + Send {
             tokio::spawn(conn);
             sender = sender_;
         } else if scheme == "https" {
-            let server = utils::tls_connect(server, hostname).await?;
+            let server = utils::tls_connect(server, &hostname).await?;
             let (sender_, conn) = hyper::client::conn::handshake(server).await?;
             tokio::spawn(conn);
             sender = sender_;

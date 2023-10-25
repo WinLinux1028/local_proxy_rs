@@ -1,3 +1,4 @@
+mod dns_resolve;
 mod unsplit;
 mod uri_parse;
 
@@ -7,6 +8,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_rustls::{client::TlsStream, rustls};
 
+pub use dns_resolve::dns_resolve;
 pub use unsplit::UnSplit;
 pub use uri_parse::ParsedUri;
 
@@ -40,16 +42,9 @@ where
     let a = a.split();
     let b = b.split();
 
-    let a_to_b = tokio::spawn(async {
-        let _ = copy(a.0, b.1).await;
-    });
-    let b_to_a = tokio::spawn(async {
-        let _ = copy(b.0, a.1).await;
-    });
-
     tokio::select! {
-        _ = a_to_b => {}
-        _ = b_to_a => {}
+        _ = copy(a.0, b.1) => {}
+        _ = copy(b.0, a.1) => {}
     }
 }
 

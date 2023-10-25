@@ -87,6 +87,6 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
     let proxy = PROXY.get().ok_or("")?;
     proxy
         .outbound
-        .http_proxy(&scheme, &hostname, port, request)
+        .http_proxy(scheme, hostname, port, request)
         .await
 }

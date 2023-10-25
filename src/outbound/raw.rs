@@ -15,7 +15,7 @@ impl Raw {
 
 #[async_trait]
 impl ProxyOutBound for Raw {
-    async fn connect(&self, hostname: &str, port: u16) -> Result<Connection, Error> {
+    async fn connect(&self, hostname: String, port: u16) -> Result<Connection, Error> {
         let server = TcpStream::connect(format!("{}:{}", hostname, port)).await?;
         server.set_nodelay(true)?;
         let server = tokio::io::split(server);

@@ -32,7 +32,7 @@ async fn main() {
         let stdin = std::io::stdin();
         let mut stdout = std::io::stdout();
 
-        write!(&mut stdout, "user> ").unwrap();
+        write!(&mut stdout, "proxy user> ").unwrap();
         stdout.flush().unwrap();
         let mut user = String::new();
         stdin.read_line(&mut user).unwrap();
@@ -42,7 +42,7 @@ async fn main() {
             Some(user.trim())
         };
 
-        write!(&mut stdout, "password> ").unwrap();
+        write!(&mut stdout, "proxy password> ").unwrap();
         stdout.flush().unwrap();
         let mut password = String::new();
         stdin.read_line(&mut password).unwrap();
@@ -51,6 +51,9 @@ async fn main() {
         } else {
             Some(password.trim())
         };
+
+        write!(&mut stdout, "\x1B[2J").unwrap();
+        stdout.flush().unwrap();
 
         let proxy = proxy.to_uri(user, password).unwrap();
         let proxy_protocol = proxy.scheme_str().unwrap();
@@ -64,11 +67,11 @@ async fn main() {
         outbound = Box::new(outbound::Raw::new());
     }
 
-    if PROXY.set(ProxyState { outbound }).is_err() {
+    if PROXY.set(ProxyState { config, outbound }).is_err() {
         panic!("Could not set to OnceCell");
     }
 
-    Server::try_bind(&config.listen)
+    Server::try_bind(&PROXY.get().unwrap().config.listen)
         .unwrap()
         .http1_only(true)
         .http1_header_read_timeout(Duration::from_secs(15))
@@ -93,5 +96,6 @@ async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {
 }
 
 struct ProxyState {
+    config: Config,
     outbound: Box<dyn ProxyOutBound>,
 }

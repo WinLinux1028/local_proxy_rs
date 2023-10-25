@@ -15,10 +15,16 @@ pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
     let server_hostname = server[0];
     let server_port: u16 = server[1].parse()?;
 
-    let proxy = PROXY.get().ok_or("")?;
-    let server_conn = proxy.outbound.connect(server_hostname, server_port).await?;
-    tokio::spawn(tunnel(request, server_conn));
+    let server_ips = utils::dns_resolve(server_hostname).await;
 
+    let proxy = PROXY.get().ok_or("")?;
+    //todo
+
+    let server_conn = proxy
+        .outbound
+        .connect(server_hostname.to_string(), server_port)
+        .await?;
+    tokio::spawn(tunnel(request, server_conn));
     Ok(Response::new(Body::empty()))
 }
 
