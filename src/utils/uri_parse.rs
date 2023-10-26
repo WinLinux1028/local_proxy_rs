@@ -45,6 +45,7 @@ impl TryFrom<Uri> for ParsedUri {
         let mut hostname = None;
         let mut port = None;
         let mut path = value.path();
+        let mut query = value.query();
 
         if let Some(scheme_) = value.scheme_str() {
             scheme = Some(scheme_);
@@ -89,6 +90,12 @@ impl TryFrom<Uri> for ParsedUri {
             path = "/";
         }
 
+        if let Some(query_) = query {
+            if query_.is_empty() {
+                query = None;
+            }
+        }
+
         Ok(ParsedUri {
             scheme: scheme.map(|s| s.to_string()),
             user: user.map(|u| u.to_string()),
@@ -96,7 +103,7 @@ impl TryFrom<Uri> for ParsedUri {
             hostname: hostname.map(|h| h.to_string()),
             port,
             path: path.to_string(),
-            query: value.query().map(|q| q.to_string()),
+            query: query.map(|q| q.to_string()),
         })
     }
 }
