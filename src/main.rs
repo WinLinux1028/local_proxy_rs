@@ -52,7 +52,7 @@ async fn main() {
             Some(password.trim())
         };
 
-        write!(&mut stdout, "\x1B[2J").unwrap();
+        write!(&mut stdout, "\x1B[H\x1B[2J\x1B[3J").unwrap();
         stdout.flush().unwrap();
 
         let proxy = proxy.to_uri(user, password).unwrap();
