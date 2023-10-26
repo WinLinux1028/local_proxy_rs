@@ -44,6 +44,7 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
     }
 
     request.headers_mut().remove("keep-alive");
+    request.headers_mut().remove("transfer-encoding");
     let proxy_header: Vec<String> = request
         .headers()
         .keys()
