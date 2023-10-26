@@ -87,14 +87,21 @@ impl ProxyOutBound for HttpProxy {
         server.flush().await?;
 
         let mut response = String::new();
-        while !response.ends_with("\r\n\r\n") {
+        if server.read_line(&mut response).await? == 0 {
+            return Err("".into());
+        }
+        let mut response_code = response.split(' ');
+        response_code.next();
+        let response_code: u16 = response_code.next().ok_or("")?.parse()?;
+        if !(200..=299).contains(&response_code) {
+            return Err("".into());
+        }
+
+        while response != "\r\n" {
+            response.clear();
             if server.read_line(&mut response).await? == 0 {
                 return Err("".into());
             }
-        }
-        let response = Response::new(response);
-        if !response.status().is_success() {
-            return Err("".into());
         }
 
         Ok(server)
@@ -108,7 +115,7 @@ impl ProxyOutBound for HttpProxy {
         mut request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
         if scheme != "http" {
-            return ProxyOutBound::http_proxy(self, scheme, hostname, port, request).await;
+            return super::default_http_proxy(self, scheme, hostname, port, request).await;
         }
 
         let server = self.connect_to_proxy_server().await?;

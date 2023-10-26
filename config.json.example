@@ -3,6 +3,6 @@
         "protocol": "http",
         "server": "114.51.48.10:1919"
     },
-    "doh_endpoint": "https://1.1.1.1/dns-query",
+    "doh_endpoint": "https://8.8.8.8/dns-query",
     "listen": "127.0.0.1:8080"
 }

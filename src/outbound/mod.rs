@@ -25,34 +25,46 @@ pub trait ProxyOutBound: Unpin + Sync + Send {
         scheme: String,
         hostname: String,
         port: u16,
-        mut request: Request<Body>,
+        request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
-        let server = self.connect(hostname.clone(), port).await?;
-
-        let mut sender;
-        if scheme == "http" {
-            let (sender_, conn) = hyper::client::conn::handshake(server).await?;
-            tokio::spawn(conn);
-            sender = sender_;
-        } else if scheme == "https" {
-            let server = utils::tls_connect(server, &hostname).await?;
-            let (sender_, conn) = hyper::client::conn::handshake(server).await?;
-            tokio::spawn(conn);
-            sender = sender_;
-        } else {
-            return Err("".into());
-        }
-
-        let client = hyper::upgrade::on(&mut request);
-        let mut response = sender.send_request(request).await?;
-        response.headers_mut().remove("keep-alive");
-        let server = hyper::upgrade::on(&mut response);
-        if response.status() == StatusCode::SWITCHING_PROTOCOLS {
-            tokio::spawn(proxy_upgrade(client, server));
-        }
-
-        Ok(response)
+        default_http_proxy(self, scheme, hostname, port, request).await
     }
+}
+
+async fn default_http_proxy<P>(
+    proxy: &P,
+    scheme: String,
+    hostname: String,
+    port: u16,
+    mut request: Request<Body>,
+) -> Result<Response<Body>, Error>
+where
+    P: ProxyOutBound + ?Sized,
+{
+    let server = proxy.connect(hostname.clone(), port).await?;
+
+    let mut sender;
+    if scheme == "http" {
+        let (sender_, conn) = hyper::client::conn::handshake(server).await?;
+        tokio::spawn(conn);
+        sender = sender_;
+    } else if scheme == "https" {
+        let server = utils::tls_connect(server, &hostname).await?;
+        let (sender_, conn) = hyper::client::conn::handshake(server).await?;
+        tokio::spawn(conn);
+        sender = sender_;
+    } else {
+        return Err("".into());
+    }
+
+    let client = hyper::upgrade::on(&mut request);
+    let mut response = sender.send_request(request).await?;
+    let server = hyper::upgrade::on(&mut response);
+    if response.status() == StatusCode::SWITCHING_PROTOCOLS {
+        tokio::spawn(proxy_upgrade(client, server));
+    }
+
+    Ok(response)
 }
 
 async fn proxy_upgrade(client: OnUpgrade, server: OnUpgrade) -> Result<(), Error> {

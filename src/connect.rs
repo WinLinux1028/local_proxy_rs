@@ -3,8 +3,9 @@ use crate::{
     Error, PROXY,
 };
 
+use dns_parser::QueryType;
 use hyper::{Body, Request, Response};
-use tokio::io::{AsyncBufRead, AsyncWrite, BufReader};
+use tokio::io::BufReader;
 
 pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
     let server: ParsedUri = request.uri().clone().try_into()?;
@@ -14,31 +15,34 @@ pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
 
     let proxy = PROXY.get().ok_or("")?;
 
-    let mut server_conn = None;
-    //todo
-
-    if server_conn.is_none() {
-        server_conn = Some(
-            proxy
+    let server_conn;
+    tokio::select! {
+        Ok(conn) = async {
+            let server_ip = utils::dns_resolve(QueryType::AAAA, server.hostname().ok_or("")?).await?;
+            let conn = proxy.outbound.connect(format!("[{}]", server_ip), server_port).await?;
+            Ok::<_, Error>(conn)
+        } => server_conn = conn,
+        Ok(conn) = async {
+            let server_ip = utils::dns_resolve(QueryType::A, server.hostname().ok_or("")?).await?;
+            let conn = proxy.outbound.connect(server_ip.to_string(), server_port).await?;
+            Ok::<_, Error>(conn)
+        } => server_conn = conn,
+        else => {
+            server_conn = proxy
                 .outbound
                 .connect(server_hostname.to_string(), server_port)
-                .await?,
-        );
+                .await?;
+        }
     }
 
-    tokio::spawn(tunnel(request, server_conn.ok_or("")?));
+    tokio::spawn(async {
+        let client = hyper::upgrade::on(request).await?;
+        let client = tokio::io::split(client);
+        let client = unsafe { UnSplit::new(BufReader::new(client.0), client.1) };
+
+        utils::copy_bidirectional(client, server_conn).await;
+        Ok::<_, Error>(())
+    });
+
     Ok(Response::new(Body::empty()))
-}
-
-async fn tunnel<R, W>(request: Request<Body>, server: UnSplit<R, W>) -> Result<(), Error>
-where
-    R: AsyncBufRead + Unpin + Send + 'static,
-    W: AsyncWrite + Unpin + Send + 'static,
-{
-    let client = hyper::upgrade::on(request).await?;
-    let client = tokio::io::split(client);
-    let client = unsafe { UnSplit::new(BufReader::new(client.0), client.1) };
-
-    utils::copy_bidirectional(client, server).await;
-    Ok(())
 }

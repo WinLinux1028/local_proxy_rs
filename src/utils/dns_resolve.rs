@@ -1,28 +1,22 @@
 use crate::{http_proxy, Error, PROXY};
 
-use bytes::Bytes;
-use dns_message_parser::{
-    question::{QClass, QType, Question},
-    rr::RR,
-};
+use dns_parser::{QueryClass, QueryType, RData};
 use hyper::{body::HttpBody, Body, Method, Request, Uri};
 use std::{net::IpAddr, str::FromStr};
 
-pub async fn dns_resolve(q_type: QType, domain: &str) -> Result<IpAddr, Error> {
+pub async fn dns_resolve(qtype: QueryType, domain: &str) -> Result<IpAddr, Error> {
     if let Ok(addr) = IpAddr::from_str(domain) {
         return Ok(addr);
     }
 
-    let query = Question {
-        domain_name: domain.parse()?,
-        q_class: QClass::IN,
-        q_type,
-    };
-    let query: [Result<_, Error>; 1] = [Ok(query.encode()?)];
-    let query = futures_util::stream::iter(query);
-
     let proxy = PROXY.get().ok_or("")?;
     let uri = Uri::from_str(proxy.config.doh_endpoint.as_ref().ok_or("")?)?;
+
+    let mut query = dns_parser::Builder::new_query(0xabcd, true);
+    query.add_question(domain, false, qtype, QueryClass::IN);
+    let query = query.build().map_err(|_| "")?;
+    let query: [Result<_, Error>; 1] = [Ok(query)];
+    let query = futures_util::stream::iter(query);
     let request = Request::builder()
         .method(Method::POST)
         .uri(&uri)
@@ -39,10 +33,18 @@ pub async fn dns_resolve(q_type: QType, domain: &str) -> Result<IpAddr, Error> {
     while let Some(chunk) = response.body_mut().data().await {
         response_body.extend_from_slice(chunk?.as_ref());
     }
+    let response_body = dns_parser::Packet::parse(&response_body)?;
 
-    match RR::decode(Bytes::from(response_body))? {
-        RR::A(addr) => Ok(IpAddr::V4(addr.ipv4_addr)),
-        RR::AAAA(addr) => Ok(IpAddr::V6(addr.ipv6_addr)),
-        _ => Err("".into()),
+    for answer in response_body.answers {
+        if answer.cls != dns_parser::Class::IN {
+            continue;
+        }
+        match answer.data {
+            RData::A(addr) => return Ok(IpAddr::V4(addr.0)),
+            RData::AAAA(addr) => return Ok(IpAddr::V6(addr.0)),
+            _ => continue,
+        }
     }
+
+    Err("".into())
 }

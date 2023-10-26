@@ -2,7 +2,7 @@ use hyper::Uri;
 
 use crate::Error;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ParsedUri {
     pub scheme: Option<String>,
     pub user: Option<String>,
