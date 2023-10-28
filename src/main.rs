@@ -120,5 +120,5 @@ struct ProxyState {
     proxy_stack: Vec<Box<dyn ProxyOutBound>>,
 }
 
-trait Stream: AsyncRead + AsyncWrite {}
+pub trait Stream: AsyncRead + AsyncWrite {}
 impl<RW> Stream for RW where RW: AsyncRead + AsyncWrite {}
