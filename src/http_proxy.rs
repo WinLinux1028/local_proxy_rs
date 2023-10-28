@@ -58,21 +58,13 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
 
     let scheme = uri.scheme().ok_or("")?.to_string();
     let hostname = uri.hostname().ok_or("")?.to_string();
-    let port;
     let mut host_header = hostname.clone();
-    if let Some(port_) = uri.port {
-        port = port_;
+    if let Some(port) = uri.port {
         if (scheme == "http" && port == 80) || (scheme == "https" && port == 443) {
             uri.port = None;
         } else {
             host_header.push(':');
             host_header.push_str(&port.to_string());
-        }
-    } else {
-        match scheme.as_str() {
-            "http" => port = 80,
-            "https" => port = 443,
-            _ => return Err("".into()),
         }
     }
     request.headers_mut().insert("host", host_header.parse()?);
@@ -86,8 +78,10 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
     *request.uri_mut() = uri.try_into()?;
 
     let proxy = PROXY.get().ok_or("")?;
-    proxy
-        .outbound
-        .http_proxy(scheme, hostname, port, request)
+    let mut proxies = proxy.proxy_stack.iter().rev();
+    proxies
+        .next()
+        .ok_or("")?
+        .http_proxy(Box::new(proxies), &scheme, request)
         .await
 }

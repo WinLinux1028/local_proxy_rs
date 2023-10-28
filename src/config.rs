@@ -7,15 +7,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
-    pub proxy: Option<ProxyConfig>,
+    pub proxies: Option<Vec<ProxyConfig>>,
     pub doh_endpoint: Option<String>,
     pub listen: SocketAddr,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ProxyConfig {
-    protocol: String,
-    server: String,
+    pub protocol: String,
+    pub server: String,
 }
 
 impl ProxyConfig {

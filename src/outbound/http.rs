@@ -1,34 +1,21 @@
 use super::ProxyOutBound;
-use crate::{
-    utils::{self, ParsedUri, UnSplit},
-    Connection, Error,
-};
+use crate::{outbound::ProxyOutBoundDefaultMethods, utils::ParsedUri, Connection, Error};
 
 use base64::Engine;
 use hyper::{Body, Request, Response, StatusCode, Uri};
-use std::net::{SocketAddr, ToSocketAddrs};
-use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    net::TcpStream,
-};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use async_trait::async_trait;
 
 pub struct HttpProxy {
-    addr: SocketAddr,
     hostname: String,
+    port: u16,
     auth: Option<String>,
-    tls: bool,
 }
 
 impl HttpProxy {
     pub fn new(uri: Uri) -> Result<Self, Error> {
         let uri: ParsedUri = uri.try_into()?;
-
-        let addr = format!("{}:{}", uri.hostname().ok_or("")?, uri.port.ok_or("")?)
-            .to_socket_addrs()?
-            .next()
-            .ok_or("")?;
 
         let mut auth = None;
         if let Some(user) = uri.user() {
@@ -41,33 +28,27 @@ impl HttpProxy {
         }
 
         Ok(HttpProxy {
-            addr,
             hostname: uri.hostname().ok_or("")?.to_string(),
+            port: uri.port.ok_or("")?,
             auth,
-            tls: uri.scheme().ok_or("")?.starts_with("tls+"),
         })
-    }
-
-    async fn connect_to_proxy_server(&self) -> Result<Connection, Error> {
-        let server = TcpStream::connect(&self.addr).await?;
-        server.set_nodelay(true)?;
-        if self.tls {
-            let server = utils::tls_connect(server, &self.hostname).await?;
-            let server = tokio::io::split(server);
-            let server = (BufReader::new(server.0), server.1);
-            Ok(unsafe { UnSplit::new(Box::new(server.0), Box::new(server.1)) })
-        } else {
-            let server = tokio::io::split(server);
-            let server = (BufReader::new(server.0), server.1);
-            Ok(unsafe { UnSplit::new(Box::new(server.0), Box::new(server.1)) })
-        }
     }
 }
 
 #[async_trait]
 impl ProxyOutBound for HttpProxy {
-    async fn connect(&self, hostname: String, port: u16) -> Result<Connection, Error> {
-        let mut server = self.connect_to_proxy_server().await?;
+    async fn connect(
+        &self,
+        mut proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
+        hostname: &str,
+        port: u16,
+    ) -> Result<Connection, Error> {
+        let server = proxies
+            .next()
+            .ok_or("")?
+            .connect(proxies, &self.hostname, self.port)
+            .await?;
+        let mut server = BufReader::new(server);
 
         server
             .write_all(
@@ -104,26 +85,29 @@ impl ProxyOutBound for HttpProxy {
             }
         }
 
-        Ok(server)
+        Ok(Box::new(server))
     }
 
     async fn http_proxy(
         &self,
-        scheme: String,
-        hostname: String,
-        port: u16,
+        mut proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
+        scheme: &str,
         mut request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
         if scheme != "http" {
-            return super::default_http_proxy(self, scheme, hostname, port, request).await;
+            return self.http_proxy_(proxies, scheme, request).await;
         }
 
-        let server = self.connect_to_proxy_server().await?;
+        let server = proxies
+            .next()
+            .ok_or("")?
+            .connect(proxies, &self.hostname, self.port)
+            .await?;
         let (mut sender, conn) = hyper::client::conn::handshake(server).await?;
         tokio::spawn(conn);
 
         let uri = Uri::builder()
-            .scheme(scheme.as_str())
+            .scheme(scheme)
             .authority(request.headers().get("host").ok_or("")?.to_str()?)
             .path_and_query(request.uri().path_and_query().ok_or("")?.as_str())
             .build()?;
@@ -144,7 +128,7 @@ impl ProxyOutBound for HttpProxy {
         response.headers_mut().remove("transfer-encoding");
         let server = hyper::upgrade::on(&mut response);
         if response.status() == StatusCode::SWITCHING_PROTOCOLS {
-            tokio::spawn(super::proxy_upgrade(client, server));
+            tokio::spawn(Self::proxy_upgrade(client, server));
         }
 
         Ok(response)
