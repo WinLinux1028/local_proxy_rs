@@ -1,5 +1,7 @@
-use super::ProxyOutBound;
-use crate::{outbound::ProxyOutBoundDefaultMethods, utils::ParsedUri, Connection, Error};
+use std::str::FromStr;
+
+use super::{ProxyOutBound, ProxyOutBoundDefaultMethods};
+use crate::{config::ProxyConfig, utils::SocketAddr, Connection, Error};
 
 use base64::Engine;
 use hyper::{Body, Request, Response, StatusCode, Uri};
@@ -8,28 +10,24 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use async_trait::async_trait;
 
 pub struct HttpProxy {
-    hostname: String,
-    port: u16,
+    addr: SocketAddr,
     auth: Option<String>,
 }
 
 impl HttpProxy {
-    pub fn new(uri: Uri) -> Result<Self, Error> {
-        let uri: ParsedUri = uri.try_into()?;
-
+    pub fn new(conf: &ProxyConfig) -> Result<Self, Error> {
         let mut auth = None;
-        if let Some(user) = uri.user() {
+        if let Some(user) = &conf.user {
             let base64 = base64::engine::general_purpose::STANDARD;
-            if let Some(password) = uri.password() {
+            if let Some(password) = &conf.password {
                 auth = Some(base64.encode(format!("{}:{}", user, password)));
             } else {
                 auth = Some(base64.encode(format!("{}:", user)))
             }
         }
 
-        Ok(HttpProxy {
-            hostname: uri.hostname().ok_or("")?.to_string(),
-            port: uri.port.ok_or("")?,
+        Ok(Self {
+            addr: SocketAddr::from_str(&conf.server)?,
             auth,
         })
     }
@@ -40,21 +38,20 @@ impl ProxyOutBound for HttpProxy {
     async fn connect(
         &self,
         mut proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
-        hostname: &str,
-        port: u16,
+        addr: &SocketAddr,
     ) -> Result<Connection, Error> {
         let server = proxies
             .next()
             .ok_or("")?
-            .connect(proxies, &self.hostname, self.port)
+            .connect(proxies, &self.addr)
             .await?;
         let mut server = BufReader::new(server);
 
         server
             .write_all(
                 format!(
-                    "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\nProxy-Connection: Keep-Alive\r\n",
-                    hostname, port
+                    "CONNECT {0} HTTP/1.1\r\nHost: {0}\r\nProxy-Connection: Keep-Alive\r\n",
+                    addr
                 )
                 .as_bytes(),
             )
@@ -92,16 +89,17 @@ impl ProxyOutBound for HttpProxy {
         &self,
         mut proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
         scheme: &str,
+        use_doh: bool,
         mut request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
         if scheme != "http" {
-            return self.http_proxy_(proxies, scheme, request).await;
+            return self.http_proxy_(proxies, scheme, use_doh, request).await;
         }
 
         let server = proxies
             .next()
             .ok_or("")?
-            .connect(proxies, &self.hostname, self.port)
+            .connect(proxies, &self.addr)
             .await?;
         let (mut sender, conn) = hyper::client::conn::handshake(server).await?;
         tokio::spawn(conn);

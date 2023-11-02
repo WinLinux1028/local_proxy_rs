@@ -1,9 +1,19 @@
-use crate::{utils::ParsedUri, Error, PROXY};
+use crate::{
+    utils::{HostName, ParsedUri, SocketAddr},
+    Error, PROXY,
+};
 
 use base64::Engine;
 use hyper::{Body, Request, Response};
 
-pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
+pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
+    send_request(request, true).await
+}
+
+pub async fn send_request(
+    mut request: Request<Body>,
+    use_doh: bool,
+) -> Result<Response<Body>, Error> {
     let mut uri: ParsedUri = request.uri().clone().try_into()?;
 
     if let Some(scheme) = uri.scheme() {
@@ -31,16 +41,10 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
     } else {
         uri.scheme = Some("http".to_string());
 
-        let mut host = request
-            .headers()
-            .get("host")
-            .ok_or("")?
-            .to_str()?
-            .split(':');
-        uri.hostname = Some(host.next().ok_or("")?.to_string());
-        if let Some(port) = host.next() {
-            uri.port = Some(port.parse()?);
-        }
+        let host = request.headers().get("host").ok_or("")?.to_str()?;
+        let (hostname, port) = SocketAddr::parse_host_header(host)?;
+        uri.hostname = Some(hostname);
+        uri.port = port;
     }
 
     request.headers_mut().remove("keep-alive");
@@ -57,8 +61,13 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
     }
 
     let scheme = uri.scheme().ok_or("")?.to_string();
-    let hostname = uri.hostname().ok_or("")?.to_string();
-    let mut host_header = hostname.clone();
+    let hostname = uri.hostname().ok_or("")?;
+    let mut host_header;
+    if let HostName::V6(v6) = hostname {
+        host_header = format!("[{}]", v6);
+    } else {
+        host_header = hostname.to_string();
+    }
     if let Some(port) = uri.port {
         if (scheme == "http" && port == 80) || (scheme == "https" && port == 443) {
             uri.port = None;
@@ -82,6 +91,6 @@ pub async fn run(mut request: Request<Body>) -> Result<Response<Body>, Error> {
     proxies
         .next()
         .ok_or("")?
-        .http_proxy(Box::new(proxies), &scheme, request)
+        .http_proxy(Box::new(proxies), &scheme, use_doh, request)
         .await
 }

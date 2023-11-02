@@ -1,11 +1,11 @@
-mod dns_resolve;
+mod addr;
 mod uri_parse;
 
 use crate::Error;
 
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 
-pub use dns_resolve::dns_resolve;
+pub use addr::{HostName, SocketAddr};
 pub use uri_parse::ParsedUri;
 
 pub async fn copy<R, W>(mut read: R, mut write: W) -> Result<(), Error>

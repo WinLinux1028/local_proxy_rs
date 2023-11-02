@@ -10,7 +10,7 @@ pub use socks4::Socks4Proxy;
 
 use crate::{
     outbound::layer::Layer,
-    utils::{self},
+    utils::{self, SocketAddr},
     Connection, Error,
 };
 
@@ -22,17 +22,17 @@ pub trait ProxyOutBound: Send + Sync {
     async fn connect(
         &self,
         proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
-        hostname: &str,
-        port: u16,
+        addr: &SocketAddr,
     ) -> Result<Connection, Error>;
 
     async fn http_proxy(
         &self,
         proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
         scheme: &str,
+        use_doh: bool,
         request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
-        self.http_proxy_(proxies, scheme, request).await
+        self.http_proxy_(proxies, scheme, use_doh, request).await
     }
 }
 
@@ -42,27 +42,30 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
         &self,
         proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
         scheme: &str,
+        use_doh: bool,
         mut request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
-        let mut host_header = request
-            .headers()
-            .get("host")
-            .ok_or("")?
-            .to_str()?
-            .split(':');
-        let hostname = host_header.next().ok_or("")?;
-        let port: u16 = match host_header.next() {
-            Some(port) => port.parse()?,
+        let host = request.headers().get("host").ok_or("")?.to_str()?;
+        let (hostname, port) = SocketAddr::parse_host_header(host)?;
+        let port = match port {
+            Some(s) => s,
             None => match scheme {
                 "http" => 80,
                 "https" => 443,
                 _ => return Err("".into()),
             },
         };
+        let addr = SocketAddr::new(hostname, port);
 
-        let mut server = self.connect(proxies, hostname, port).await?;
+        let mut server;
+        if use_doh {
+            server = addr.happy_eyeballs().await?;
+        } else {
+            server = self.connect(proxies, &addr).await?;
+        }
+
         if scheme == "https" {
-            server = layer::TlsClient::new().wrap(server, hostname, port).await?;
+            server = layer::TlsClient::new().wrap(server, &addr).await?;
         }
         let (mut sender, conn) = hyper::client::conn::handshake(server).await?;
         tokio::spawn(conn);

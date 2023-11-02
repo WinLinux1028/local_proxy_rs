@@ -27,11 +27,11 @@ async fn main() {
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
 
-    let config: Config =
+    let mut config: Config =
         serde_json::from_reader(std::fs::File::open("./config.json").unwrap()).unwrap();
 
     let mut proxy_stack: Vec<Box<dyn ProxyOutBound>> = vec![Box::new(outbound::Raw::new())];
-    if let Some(proxies) = &config.proxies {
+    if let Some(proxies) = &mut config.proxies {
         for proxy in proxies {
             writeln!(
                 &mut stdout,
@@ -40,30 +40,36 @@ async fn main() {
             )
             .unwrap();
 
-            write!(&mut stdout, "proxy user> ").unwrap();
-            stdout.flush().unwrap();
-            let mut user = String::new();
-            stdin.read_line(&mut user).unwrap();
-            let user = user.trim();
-            let user = if user.is_empty() { None } else { Some(user) };
+            if proxy.user.is_none() {
+                write!(&mut stdout, "proxy user> ").unwrap();
+                stdout.flush().unwrap();
+                let mut user = String::new();
+                stdin.read_line(&mut user).unwrap();
+                proxy.user = Some(user);
+            }
+            let user = proxy.user.as_mut().unwrap();
+            *user = user.trim().to_string();
+            if user.is_empty() {
+                proxy.user = None;
+            }
 
-            write!(&mut stdout, "proxy password> ").unwrap();
-            stdout.flush().unwrap();
-            let mut password = String::new();
-            stdin.read_line(&mut password).unwrap();
-            let password = password.trim();
-            let password = if password.is_empty() {
-                None
-            } else {
-                Some(password)
-            };
+            if proxy.password.is_none() {
+                write!(&mut stdout, "proxy password> ").unwrap();
+                stdout.flush().unwrap();
+                let mut password = String::new();
+                stdin.read_line(&mut password).unwrap();
+                proxy.password = Some(password.to_string());
+            }
+            let password = proxy.password.as_mut().unwrap();
+            *password = password.trim().to_string();
+            if password.is_empty() {
+                proxy.password = None;
+            }
 
             write!(&mut stdout, "\x1B[H\x1B[2J\x1B[3J").unwrap();
             stdout.flush().unwrap();
 
-            let proxy = proxy.to_uri(user, password).unwrap();
-            let proxy_protocol: Vec<&str> = proxy.scheme_str().unwrap().split('+').collect();
-
+            let proxy_protocol: Vec<&str> = proxy.protocol.split('+').collect();
             for layer in &proxy_protocol[0..proxy_protocol.len() - 1] {
                 if *layer == "tls" {
                     proxy_stack.push(Box::new(outbound::layer::TlsClient {}));

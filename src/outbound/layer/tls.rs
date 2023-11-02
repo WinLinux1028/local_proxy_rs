@@ -1,5 +1,5 @@
 use super::Layer;
-use crate::{Connection, Error};
+use crate::{utils::SocketAddr, Connection, Error};
 
 use std::sync::Arc;
 
@@ -32,12 +32,14 @@ impl TlsClient {
 
 #[async_trait]
 impl Layer for TlsClient {
-    async fn wrap<RW>(&self, stream: RW, hostname: &str, _: u16) -> Result<Connection, Error>
+    async fn wrap<RW>(&self, stream: RW, addr: &SocketAddr) -> Result<Connection, Error>
     where
         RW: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
         Ok(Box::new(
-            CONNECTOR.connect(hostname.try_into()?, stream).await?,
+            CONNECTOR
+                .connect(addr.hostname.to_string().as_str().try_into()?, stream)
+                .await?,
         ))
     }
 }

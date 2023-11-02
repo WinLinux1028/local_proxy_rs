@@ -1,5 +1,5 @@
 use super::ProxyOutBound;
-use crate::{Connection, Error};
+use crate::{utils::SocketAddr, Connection, Error};
 
 use tokio::net::TcpStream;
 
@@ -18,14 +18,13 @@ impl ProxyOutBound for Raw {
     async fn connect(
         &self,
         mut proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
-        hostname: &str,
-        port: u16,
+        addr: &SocketAddr,
     ) -> Result<Connection, Error> {
         if let Some(proxy) = proxies.next() {
-            return proxy.connect(proxies, hostname, port).await;
+            return proxy.connect(proxies, addr).await;
         }
 
-        let server = TcpStream::connect(format!("{}:{}", hostname, port)).await?;
+        let server = TcpStream::connect(addr.to_string()).await?;
         server.set_nodelay(true)?;
 
         Ok(Box::new(server))
