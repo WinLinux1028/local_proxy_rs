@@ -13,8 +13,17 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use std::{io::Write, time::Duration};
-use tokio::io::{AsyncRead, AsyncWrite};
+use lru_time_cache::LruCache;
+use std::{
+    hash::Hash,
+    io::Write,
+    net::{Ipv4Addr, Ipv6Addr},
+    time::Duration,
+};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    sync::Mutex,
+};
 
 use once_cell::sync::OnceCell;
 
@@ -81,15 +90,24 @@ async fn main() {
             let proxy_protocol_main = proxy_protocol[proxy_protocol.len() - 1];
             if proxy_protocol_main == "http" {
                 proxy_stack.push(Box::new(outbound::HttpProxy::new(proxy).unwrap()));
+            } else if proxy_protocol_main == "socks4" {
+                proxy_stack.push(Box::new(outbound::Socks4Proxy::new(proxy).unwrap()));
             } else {
                 panic!("This protocol can not use: {}", proxy_protocol_main);
             }
         }
     }
 
+    let dns_cache = if config.doh_endpoint.is_some() {
+        LruCache::with_expiry_duration_and_capacity(Duration::from_secs(7200), 65535)
+    } else {
+        LruCache::with_capacity(0)
+    };
+
     if PROXY
         .set(ProxyState {
             config,
+            dns_cache: Mutex::new(dns_cache),
             proxy_stack,
         })
         .is_err()
@@ -121,9 +139,17 @@ async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 struct ProxyState {
     config: Config,
+    dns_cache: Mutex<LruCache<String, (DnsCacheState<Ipv4Addr>, DnsCacheState<Ipv6Addr>)>>,
     proxy_stack: Vec<Box<dyn ProxyOutBound>>,
+}
+
+enum DnsCacheState<T: Hash> {
+    Some(T),
+    Fail,
+    None,
 }
 
 pub trait Stream: AsyncRead + AsyncWrite {}

@@ -1,5 +1,5 @@
 use super::ParsedUri;
-use crate::{http_proxy, Connection, Error, PROXY};
+use crate::{http_proxy, Connection, DnsCacheState, Error, PROXY};
 
 use std::{
     fmt::{Display, Write},
@@ -150,6 +150,30 @@ impl HostName {
             _ => return Err("".into()),
         };
 
+        let proxy = PROXY.get().ok_or("")?;
+        let mut uri: ParsedUri =
+            Uri::from_str(proxy.config.doh_endpoint.as_ref().ok_or("")?)?.try_into()?;
+
+        let mut dns_cache = proxy.dns_cache.lock().await;
+        if let Some(cache_content) = dns_cache.get(domain) {
+            if qtype == QueryType::A {
+                match cache_content.0 {
+                    DnsCacheState::Some(s) => return Ok(Self::V4(s)),
+                    DnsCacheState::Fail => return Err("".into()),
+                    DnsCacheState::None => (),
+                }
+            } else if qtype == QueryType::AAAA {
+                match cache_content.1 {
+                    DnsCacheState::Some(s) => return Ok(Self::V6(s)),
+                    DnsCacheState::Fail => return Err("".into()),
+                    DnsCacheState::None => (),
+                }
+            } else {
+                return Err("".into());
+            }
+        }
+        drop(dns_cache);
+
         let mut query = dns_parser::Builder::new_query(0xabcd, true);
         query.add_question(domain, false, qtype, QueryClass::IN);
         let query = query.build().map_err(|_| "")?;
@@ -157,9 +181,6 @@ impl HostName {
         let base64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
         let query = base64.encode(query);
 
-        let proxy = PROXY.get().ok_or("")?;
-        let mut uri: ParsedUri =
-            Uri::from_str(proxy.config.doh_endpoint.as_ref().ok_or("")?)?.try_into()?;
         if let Some(s) = uri.query.as_mut() {
             s.push_str(&format!("&dns={}", query));
         } else {
@@ -184,17 +205,33 @@ impl HostName {
         }
         let response_body = dns_parser::Packet::parse(&response_body)?;
 
+        let mut dns_cache = proxy.dns_cache.lock().await;
+        let cache_content = dns_cache
+            .entry(domain.to_string())
+            .or_insert((DnsCacheState::None, DnsCacheState::None));
+
         for answer in response_body.answers {
             if answer.cls != dns_parser::Class::IN {
                 continue;
             }
             match answer.data {
-                RData::A(addr) => return Ok(Self::V4(addr.0)),
-                RData::AAAA(addr) => return Ok(Self::V6(addr.0)),
+                RData::A(addr) => {
+                    cache_content.0 = DnsCacheState::Some(addr.0);
+                    return Ok(Self::V4(addr.0));
+                }
+                RData::AAAA(addr) => {
+                    cache_content.1 = DnsCacheState::Some(addr.0);
+                    return Ok(Self::V6(addr.0));
+                }
                 _ => continue,
             }
         }
 
+        if qtype == QueryType::A {
+            cache_content.0 = DnsCacheState::Fail;
+        } else if qtype == QueryType::AAAA {
+            cache_content.1 = DnsCacheState::Fail;
+        }
         Err("".into())
     }
 }
