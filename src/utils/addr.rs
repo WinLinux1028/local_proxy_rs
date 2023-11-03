@@ -5,6 +5,7 @@ use std::{
     fmt::{Display, Write},
     net::{Ipv4Addr, Ipv6Addr},
     str::FromStr,
+    time::Duration,
 };
 
 use base64::Engine;
@@ -154,7 +155,7 @@ impl HostName {
         let mut uri: ParsedUri =
             Uri::from_str(proxy.config.doh_endpoint.as_ref().ok_or("")?)?.try_into()?;
 
-        let mut dns_cache = proxy.dns_cache.lock().await;
+        let dns_cache = proxy.dns_cache.read().await;
         if let Some(cache_content) = dns_cache.get(domain) {
             if qtype == QueryType::A {
                 match cache_content.0 {
@@ -205,10 +206,15 @@ impl HostName {
         }
         let response_body = dns_parser::Packet::parse(&response_body)?;
 
-        let mut dns_cache = proxy.dns_cache.lock().await;
-        let cache_content = dns_cache
-            .entry(domain.to_string())
-            .or_insert((DnsCacheState::None, DnsCacheState::None));
+        let mut dns_cache = proxy.dns_cache.write().await;
+        if !dns_cache.contains_key(domain) {
+            dns_cache.insert(
+                domain.clone(),
+                (DnsCacheState::None, DnsCacheState::None),
+                Duration::from_secs(7200),
+            );
+        }
+        let cache_content = dns_cache.get_mut(domain).ok_or("")?;
 
         for answer in response_body.answers {
             if answer.cls != dns_parser::Class::IN {

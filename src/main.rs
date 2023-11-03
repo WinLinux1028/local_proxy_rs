@@ -13,7 +13,6 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use lru_time_cache::LruCache;
 use std::{
     hash::Hash,
     io::Write,
@@ -22,8 +21,9 @@ use std::{
 };
 use tokio::{
     io::{AsyncRead, AsyncWrite},
-    sync::Mutex,
+    sync::RwLock,
 };
+use ttl_cache::TtlCache;
 
 use once_cell::sync::OnceCell;
 
@@ -99,15 +99,15 @@ async fn main() {
     }
 
     let dns_cache = if config.doh_endpoint.is_some() {
-        LruCache::with_expiry_duration_and_capacity(Duration::from_secs(7200), 65535)
+        TtlCache::new(65535)
     } else {
-        LruCache::with_capacity(0)
+        TtlCache::new(0)
     };
 
     if PROXY
         .set(ProxyState {
             config,
-            dns_cache: Mutex::new(dns_cache),
+            dns_cache: RwLock::new(dns_cache),
             proxy_stack,
         })
         .is_err()
@@ -142,7 +142,7 @@ async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {
 #[allow(clippy::type_complexity)]
 struct ProxyState {
     config: Config,
-    dns_cache: Mutex<LruCache<String, (DnsCacheState<Ipv4Addr>, DnsCacheState<Ipv6Addr>)>>,
+    dns_cache: RwLock<TtlCache<String, (DnsCacheState<Ipv4Addr>, DnsCacheState<Ipv6Addr>)>>,
     proxy_stack: Vec<Box<dyn ProxyOutBound>>,
 }
 
