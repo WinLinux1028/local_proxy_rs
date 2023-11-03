@@ -80,20 +80,18 @@ async fn main() {
 
             let proxy_protocol: Vec<&str> = proxy.protocol.split('+').collect();
             for layer in &proxy_protocol[0..proxy_protocol.len() - 1] {
-                if *layer == "tls" {
-                    proxy_stack.push(Box::new(outbound::layer::TlsClient {}));
-                } else {
-                    panic!("This protocol can not use: {}", layer);
+                match *layer {
+                    "tls" => proxy_stack.push(Box::new(outbound::layer::TlsClient {})),
+                    _ => panic!("This protocol can not use: {}", layer),
                 }
             }
 
             let proxy_protocol_main = proxy_protocol[proxy_protocol.len() - 1];
-            if proxy_protocol_main == "http" {
-                proxy_stack.push(Box::new(outbound::HttpProxy::new(proxy).unwrap()));
-            } else if proxy_protocol_main == "socks4" {
-                proxy_stack.push(Box::new(outbound::Socks4Proxy::new(proxy).unwrap()));
-            } else {
-                panic!("This protocol can not use: {}", proxy_protocol_main);
+            match proxy_protocol_main {
+                "http" => proxy_stack.push(Box::new(outbound::HttpProxy::new(proxy).unwrap())),
+                "socks4" => proxy_stack.push(Box::new(outbound::Socks4Proxy::new(proxy).unwrap())),
+                "socks5" => proxy_stack.push(Box::new(outbound::Socks5Proxy::new(proxy).unwrap())),
+                _ => panic!("This protocol can not use: {}", proxy_protocol_main),
             }
         }
     }

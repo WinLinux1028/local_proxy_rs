@@ -3,10 +3,12 @@ pub mod layer;
 mod http;
 mod raw;
 mod socks4;
+mod socks5;
 
 pub use http::HttpProxy;
 pub use raw::Raw;
 pub use socks4::Socks4Proxy;
+pub use socks5::Socks5Proxy;
 
 use crate::{
     outbound::layer::Layer,

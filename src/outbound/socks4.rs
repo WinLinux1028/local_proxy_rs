@@ -5,7 +5,7 @@ use crate::{
     Connection, Error,
 };
 
-use std::str::FromStr;
+use std::{net::Ipv4Addr, str::FromStr};
 
 use async_trait::async_trait;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -49,11 +49,11 @@ impl ProxyOutBound for Socks4Proxy {
         match &addr.hostname {
             HostName::V4(v4) => ip = *v4,
             HostName::Domain(domain) => {
-                ip = "0.0.0.1".parse()?;
+                ip = Ipv4Addr::new(0, 0, 0, 1);
                 if domain.contains('\0') {
                     return Err("".into());
                 }
-                hostname = Some(domain);
+                hostname = Some(domain.clone());
             }
             HostName::V6(_) => return Err("".into()),
         }
@@ -81,7 +81,7 @@ impl ProxyOutBound for Socks4Proxy {
             server.write_all(auth.as_bytes()).await?
         }
         server.write_all(b"\0").await?;
-        if let Some(hostname) = hostname {
+        if let Some(hostname) = &hostname {
             server.write_all(hostname.as_bytes()).await?;
             server.write_all(b"\0").await?;
         }
