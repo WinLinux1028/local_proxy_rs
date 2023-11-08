@@ -1,4 +1,3 @@
-use super::ParsedUri;
 use crate::{http_proxy, Connection, DnsCacheState, Error, PROXY};
 
 use std::{
@@ -8,7 +7,6 @@ use std::{
     time::Duration,
 };
 
-use base64::Engine;
 use dns_parser::{QueryClass, QueryType, RData};
 use hyper::{body::HttpBody, Body, Method, Request, Uri};
 
@@ -152,8 +150,7 @@ impl HostName {
         };
 
         let proxy = PROXY.get().ok_or("")?;
-        let mut uri: ParsedUri =
-            Uri::from_str(proxy.config.doh_endpoint.as_ref().ok_or("")?)?.try_into()?;
+        let uri = Uri::from_str(proxy.config.doh_endpoint.as_ref().ok_or("")?)?;
 
         let dns_cache = proxy.dns_cache.read().await;
         if let Some(cache_content) = dns_cache.get(domain) {
@@ -179,21 +176,17 @@ impl HostName {
         query.add_question(domain, false, qtype, QueryClass::IN);
         let query = query.build().map_err(|_| "")?;
 
-        let base64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-        let query = base64.encode(query);
-
-        if let Some(s) = uri.query.as_mut() {
-            s.push_str(&format!("&dns={}", query));
-        } else {
-            uri.query = Some(format!("dns={}", query));
-        }
-        let uri: Uri = uri.try_into()?;
+        let query_len = query.len();
+        let query: [Result<_, Error>; 1] = [Ok(query)];
+        let query = futures_util::stream::iter(query);
 
         let request = Request::builder()
-            .method(Method::GET)
+            .method(Method::POST)
             .uri(&uri)
             .header("accept", "application/dns-message")
-            .body(Body::empty())?;
+            .header("content-type", "application/dns-message")
+            .header("content-length", query_len.to_string())
+            .body(Body::wrap_stream(query))?;
 
         let mut response = http_proxy::send_request(request, false).await?;
         if !response.status().is_success() {
