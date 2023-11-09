@@ -4,7 +4,7 @@ use crate::{
 };
 
 use base64::Engine;
-use hyper::{Body, Request, Response};
+use hyper::{header::HeaderValue, Body, Request, Response};
 
 pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
     send_request(request, true).await
@@ -47,8 +47,23 @@ pub async fn send_request(
         uri.port = port;
     }
 
-    request.headers_mut().remove("keep-alive");
-    request.headers_mut().remove("transfer-encoding");
+    let mut value_ = None;
+    if let Some(value) = request.headers_mut().get_mut("te") {
+        for i in value.to_str()?.split(',').map(|v| v.trim()) {
+            match i.split(';').next() {
+                Some("trailers") => {
+                    value_ = Some(HeaderValue::from_static("trailers"));
+                    break;
+                }
+                _ => continue,
+            }
+        }
+    }
+    match value_ {
+        Some(s) => request.headers_mut().insert("te", s),
+        None => request.headers_mut().remove("te"),
+    };
+
     let proxy_header: Vec<String> = request
         .headers()
         .keys()
