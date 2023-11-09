@@ -11,7 +11,7 @@ use crate::{config::Config, outbound::ProxyOutBound};
 
 use hyper::{
     service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, Server, StatusCode,
+    Body, Method, Request, Response, Server,
 };
 use std::{
     hash::Hash,
@@ -128,10 +128,6 @@ async fn main() {
 async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {
     if request.method() == Method::CONNECT {
         connect::run(request).await
-    } else if request.method() == Method::TRACE {
-        Ok(Response::builder()
-            .status(StatusCode::METHOD_NOT_ALLOWED)
-            .body(Body::empty())?)
     } else {
         http_proxy::run(request).await
     }
