@@ -11,7 +11,7 @@ use crate::{config::Config, outbound::ProxyOutBound};
 
 use hyper::{
     service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, Server,
+    Body, Method, Request, Response, Server, StatusCode,
 };
 use std::{
     hash::Hash,
@@ -27,6 +27,7 @@ use ttl_cache::TtlCache;
 
 use once_cell::sync::OnceCell;
 
+static ERROR_HTML: &[u8] = include_bytes!("../static/error.html");
 static PROXY: OnceCell<ProxyState> = OnceCell::new();
 type Error = Box<dyn std::error::Error + Sync + Send>;
 type Connection = Box<dyn Stream + Unpin + Send>;
@@ -126,11 +127,22 @@ async fn main() {
 }
 
 async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {
-    if request.method() == Method::CONNECT {
+    let mut response = if request.method() == Method::CONNECT {
         connect::run(request).await
     } else {
         http_proxy::run(request).await
+    };
+
+    if response.is_err() {
+        response = Ok(Response::builder()
+            .status(StatusCode::BAD_GATEWAY)
+            .header("connection", "keep-alive")
+            .header("content-type", "text/html; charset=utf-8")
+            .header("content-length", ERROR_HTML.len().to_string())
+            .body(Body::from(ERROR_HTML))?);
     }
+
+    response
 }
 
 #[allow(clippy::type_complexity)]

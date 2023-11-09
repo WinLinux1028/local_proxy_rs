@@ -176,17 +176,13 @@ impl HostName {
         query.add_question(domain, false, qtype, QueryClass::IN);
         let query = query.build().map_err(|_| "")?;
 
-        let query_len = query.len();
-        let query: [Result<_, Error>; 1] = [Ok(query)];
-        let query = futures_util::stream::iter(query);
-
         let request = Request::builder()
             .method(Method::POST)
             .uri(&uri)
             .header("accept", "application/dns-message")
             .header("content-type", "application/dns-message")
-            .header("content-length", query_len.to_string())
-            .body(Body::wrap_stream(query))?;
+            .header("content-length", query.len().to_string())
+            .body(Body::from(query))?;
 
         let mut response = http_proxy::send_request(request, false).await?;
         if !response.status().is_success() {

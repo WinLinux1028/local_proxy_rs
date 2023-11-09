@@ -122,7 +122,6 @@ impl ProxyOutBound for HttpProxy {
 
         let client = hyper::upgrade::on(&mut request);
         let mut response = sender.send_request(request).await?;
-        response.headers_mut().remove("keep-alive");
         let server = hyper::upgrade::on(&mut response);
         if response.status() == StatusCode::SWITCHING_PROTOCOLS {
             tokio::spawn(Self::proxy_upgrade(client, server));

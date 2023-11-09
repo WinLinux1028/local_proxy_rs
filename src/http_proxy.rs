@@ -48,7 +48,7 @@ pub async fn send_request(
     }
 
     let mut value_ = None;
-    if let Some(value) = request.headers_mut().get_mut("te") {
+    if let Some(value) = request.headers().get("te") {
         for i in value.to_str()?.split(',').map(|v| v.trim()) {
             match i.split(';').next() {
                 Some("trailers") => {
@@ -63,7 +63,6 @@ pub async fn send_request(
         Some(s) => request.headers_mut().insert("te", s),
         None => request.headers_mut().remove("te"),
     };
-
     let proxy_header: Vec<String> = request
         .headers()
         .keys()
@@ -103,9 +102,25 @@ pub async fn send_request(
 
     let proxy = PROXY.get().ok_or("")?;
     let mut proxies = proxy.proxy_stack.iter().rev();
-    proxies
+    let mut response = proxies
         .next()
         .ok_or("")?
         .http_proxy(Box::new(proxies), &scheme, use_doh, request)
-        .await
+        .await?;
+
+    response.headers_mut().remove("keep-alive");
+    match response.headers_mut().get_mut("connection") {
+        Some(value) => {
+            if value.to_str()? == "close" {
+                *value = HeaderValue::from_static("keep-alive");
+            }
+        }
+        None => {
+            response
+                .headers_mut()
+                .insert("connection", HeaderValue::from_static("keep-alive"));
+        }
+    }
+
+    Ok(response)
 }
