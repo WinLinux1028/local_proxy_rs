@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub proxies: Option<Vec<ProxyConfig>>,
     pub doh_endpoint: Option<String>,
-    pub listen: SocketAddr,
+    pub http_listen: Option<SocketAddr>,
+    pub tproxy_listen: Option<SocketAddr>,
 }
 
 #[derive(Serialize, Deserialize)]

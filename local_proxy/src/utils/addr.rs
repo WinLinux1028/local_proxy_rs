@@ -1,4 +1,4 @@
-use crate::{http_proxy, Connection, DnsCacheState, Error, PROXY};
+use crate::{inbound::http::http_proxy, Connection, DnsCacheState, Error, PROXY};
 
 use std::{
     fmt::{Display, Write},

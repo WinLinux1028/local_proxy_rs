@@ -2,22 +2,16 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 mod config;
-mod connect;
-mod http_proxy;
+mod inbound;
 mod outbound;
 mod utils;
 
 use crate::{config::Config, outbound::ProxyOutBound};
 
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, Server, StatusCode,
-};
 use std::{
     hash::Hash,
     io::Write,
     net::{Ipv4Addr, Ipv6Addr},
-    time::Duration,
 };
 use tokio::{
     io::{AsyncRead, AsyncWrite},
@@ -114,35 +108,9 @@ async fn main() {
         panic!("Could not set to OnceCell");
     }
 
-    let server = Server::try_bind(&PROXY.get().unwrap().config.listen)
-        .unwrap()
-        .http1_only(true)
-        .http1_header_read_timeout(Duration::from_secs(15))
-        .tcp_nodelay(true)
-        .serve(make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(handle))
-        }));
-    println!("Server started");
-    server.await.unwrap();
-}
-
-async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {
-    let mut response = if request.method() == Method::CONNECT {
-        connect::run(request).await
-    } else {
-        http_proxy::run(request).await
-    };
-
-    if response.is_err() {
-        response = Ok(Response::builder()
-            .status(StatusCode::BAD_GATEWAY)
-            .header("connection", "keep-alive")
-            .header("content-type", "text/html; charset=utf-8")
-            .header("content-length", ERROR_HTML.len().to_string())
-            .body(Body::from(ERROR_HTML))?);
-    }
-
-    response
+    let _ = tokio::join!(inbound::http::start(), inbound::tproxy::start(), async {
+        println!("Server started");
+    });
 }
 
 #[allow(clippy::type_complexity)]
