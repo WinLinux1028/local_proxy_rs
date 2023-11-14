@@ -10,18 +10,28 @@ use hyper::{
 use std::time::Duration;
 
 pub async fn start() -> Result<(), Error> {
-    let listen = PROXY.get().unwrap().config.http_listen.ok_or("")?;
-    Server::try_bind(&listen)
-        .unwrap()
-        .http1_only(true)
-        .http1_header_read_timeout(Duration::from_secs(15))
-        .tcp_nodelay(true)
-        .serve(make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(handle))
-        }))
-        .await?;
+    let listen = PROXY.get().unwrap().config.http_listen.as_ref().ok_or("")?;
+    if listen.is_empty() {
+        return Ok(());
+    }
 
-    Ok(())
+    for i in listen {
+        let server = Server::try_bind(i)?
+            .http1_only(true)
+            .http1_header_read_timeout(Duration::from_secs(15))
+            .tcp_nodelay(true)
+            .serve(make_service_fn(|_| async {
+                Ok::<_, Error>(service_fn(handle))
+            }));
+
+        tokio::spawn(async {
+            let _ = server.await;
+        });
+    }
+
+    loop {
+        tokio::time::sleep(Duration::from_secs(u64::MAX)).await;
+    }
 }
 
 async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {

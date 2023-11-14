@@ -13,8 +13,32 @@
 ## 起動
 `cargo run`とすれば実行できます <br />
 `cargo run --release`とすると最適化されます <br />
+
 ## 設定
 config.jsonをカレントディレクトリに置いてください <br />
 例はconfig.json.exampleにあります <br />
 <br />
 上流のプロキシが指定されている場合､起動するとユーザー名とパスワードを聞かれた後､画面がクリアされます <br />
+
+## 透過プロキシにする例
+Linux環境で <br />
+```json
+{
+    "doh_endpoint": "https://1.1.1.1/dns-query",
+    "http_listen": ["127.0.0.1:8080", "[::1]:8080"],
+    "dns_listen": ["127.0.0.1:8081", "[::1]:8081"],
+    "tproxy_listen": {
+        "listen": ["127.0.0.1:8081", "[::1]:8081"],
+        "redir_type": "redirect"
+    }
+}
+```
+このように設定した場合､iptablesを以下のように設定します(uid-ownerは適宜変更) <br />
+```bash
+sudo iptables -t nat -A OUTPUT -m tcp -p tcp --dport 80 -m owner --uid-owner 1000 -j DNAT --to-destination 127.0.0.1:8080
+sudo ip6tables -t nat -A OUTPUT -m tcp -p tcp --dport 80 -m owner --uid-owner 1000 -j DNAT --to-destination '[::1]:8080'
+sudo iptables -t nat -A OUTPUT -m tcp -p tcp -m owner --uid-owner 1000 -j DNAT --to-destination 127.0.0.1:8081
+sudo ip6tables -t nat -A OUTPUT -m tcp -p tcp -m owner --uid-owner 1000 -j DNAT --to-destination '[::1]:8081'
+sudo iptables -t nat -A OUTPUT -m udp -p udp --dport 53 -m owner --uid-owner 1000 -j DNAT --to-destination 127.0.0.1:8081
+sudo ip6tables -t nat -A OUTPUT -m udp -p udp --dport 53 -m owner --uid-owner 1000 -j DNAT --to-destination '[::1]:8081'
+```

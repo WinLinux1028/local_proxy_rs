@@ -5,7 +5,10 @@ mod tcp;
 
 pub use tcp::{TcpListenerRedirExt, TcpStreamRedirExt};
 
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    str::FromStr,
+};
 
 use cfg_if::cfg_if;
 
@@ -123,5 +126,51 @@ impl RedirType {
 impl Display for RedirType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.write_str(self.name())
+    }
+}
+
+/// Error type for `RedirType`'s `FromStr::Err`
+#[derive(Debug)]
+pub struct InvalidRedirType;
+
+impl Display for InvalidRedirType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("invalid RedirType")
+    }
+}
+
+impl std::error::Error for InvalidRedirType {}
+
+impl FromStr for RedirType {
+    type Err = InvalidRedirType;
+
+    fn from_str(s: &str) -> Result<RedirType, InvalidRedirType> {
+        match s {
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            "redirect" => Ok(RedirType::Redirect),
+
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            "tproxy" => Ok(RedirType::TProxy),
+
+            #[cfg(any(
+                target_os = "openbsd",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "solaris",
+                target_os = "macos",
+                target_os = "ios",
+            ))]
+            "pf" => Ok(RedirType::PacketFilter),
+
+            #[cfg(any(
+                target_os = "freebsd",
+                target_os = "macos",
+                target_os = "ios",
+                target_os = "dragonfly"
+            ))]
+            "ipfw" => Ok(RedirType::IpFirewall),
+
+            _ => Err(InvalidRedirType),
+        }
     }
 }

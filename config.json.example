@@ -10,6 +10,10 @@
         }
     ],
     "doh_endpoint": "https://1.1.1.1/dns-query",
-    "http_listen": "127.0.0.1:8080",
-    "tproxy_listen": "127.0.0.1:8081"
+    "http_listen": ["127.0.0.1:8080", "[::1]:8080"],
+    "dns_listen": ["127.0.0.1:8081", "[::1]:8081"],
+    "tproxy_listen": {
+        "listen": ["127.0.0.1:8081", "[::1]:8081"],
+        "redir_type": "redirect" // redirect, tproxy, pf, ipfw
+    }
 }

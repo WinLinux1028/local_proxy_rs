@@ -108,9 +108,14 @@ async fn main() {
         panic!("Could not set to OnceCell");
     }
 
-    let _ = tokio::join!(inbound::http::start(), inbound::tproxy::start(), async {
-        println!("Server started");
-    });
+    let _ = tokio::join!(
+        inbound::http::start(),
+        inbound::tproxy::start(),
+        inbound::dns::start(),
+        async {
+            println!("Server started");
+        }
+    );
 }
 
 #[allow(clippy::type_complexity)]
