@@ -35,6 +35,8 @@ Linux環境で <br />
 ```
 このように設定した場合､iptablesを以下のように設定します(uid-ownerは適宜変更) <br />
 ```bash
+sudo iptables -A OUTPUT -m udp -p udp ! --dport 8081 -m owner --uid-owner 1000 -j REJECT
+sudo ip6tables -A OUTPUT -m udp -p udp ! --dport 8081 -m owner --uid-owner 1000 -j REJECT
 sudo iptables -t nat -A OUTPUT -m tcp -p tcp --dport 80 -m owner --uid-owner 1000 -j DNAT --to-destination 127.0.0.1:8080
 sudo ip6tables -t nat -A OUTPUT -m tcp -p tcp --dport 80 -m owner --uid-owner 1000 -j DNAT --to-destination '[::1]:8080'
 sudo iptables -t nat -A OUTPUT -m tcp -p tcp -m owner --uid-owner 1000 -j DNAT --to-destination 127.0.0.1:8081
