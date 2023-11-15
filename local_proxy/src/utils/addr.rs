@@ -156,15 +156,15 @@ impl HostName {
         if let Some(cache_content) = dns_cache.get(domain) {
             if qtype == QueryType::A {
                 match cache_content.0 {
-                    DnsCacheState::Some(s) => return Ok(Self::V4(s)),
+                    DnsCacheState::Some(s) => return Ok(s.into()),
                     DnsCacheState::Fail => return Err("".into()),
-                    DnsCacheState::None => (),
+                    DnsCacheState::None => {}
                 }
             } else if qtype == QueryType::AAAA {
                 match cache_content.1 {
-                    DnsCacheState::Some(s) => return Ok(Self::V6(s)),
+                    DnsCacheState::Some(s) => return Ok(s.into()),
                     DnsCacheState::Fail => return Err("".into()),
-                    DnsCacheState::None => (),
+                    DnsCacheState::None => {}
                 }
             } else {
                 return Err("".into());
@@ -212,11 +212,11 @@ impl HostName {
             match answer.data {
                 RData::A(addr) => {
                     cache_content.0 = DnsCacheState::Some(addr.0);
-                    return Ok(Self::V4(addr.0));
+                    return Ok(addr.0.into());
                 }
                 RData::AAAA(addr) => {
                     cache_content.1 = DnsCacheState::Some(addr.0);
-                    return Ok(Self::V6(addr.0));
+                    return Ok(addr.0.into());
                 }
                 _ => continue,
             }
@@ -255,8 +255,23 @@ impl FromStr for HostName {
 impl From<std::net::IpAddr> for HostName {
     fn from(value: std::net::IpAddr) -> Self {
         match value {
-            std::net::IpAddr::V4(v4) => Self::V4(v4),
-            std::net::IpAddr::V6(v6) => Self::V6(v6),
+            std::net::IpAddr::V4(v4) => v4.into(),
+            std::net::IpAddr::V6(v6) => v6.into(),
+        }
+    }
+}
+
+impl From<std::net::Ipv4Addr> for HostName {
+    fn from(value: std::net::Ipv4Addr) -> Self {
+        Self::V4(value)
+    }
+}
+
+impl From<std::net::Ipv6Addr> for HostName {
+    fn from(value: std::net::Ipv6Addr) -> Self {
+        match value.to_ipv4_mapped() {
+            Some(v4) => Self::V4(v4),
+            None => Self::V6(value),
         }
     }
 }

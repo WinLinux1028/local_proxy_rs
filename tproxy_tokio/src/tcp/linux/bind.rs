@@ -9,10 +9,13 @@ use tokio::net::{TcpListener, TcpSocket};
 pub fn create_tproxy_listener(addr: SocketAddr) -> io::Result<TcpListener> {
     let socket = match addr {
         SocketAddr::V4(_) => TcpSocket::new_v4()?,
-        SocketAddr::V6(_) => TcpSocket::new_v6()?,
+        SocketAddr::V6(_) => {
+            let s = TcpSocket::new_v6()?;
+            set_ip_transparent(libc::IPPROTO_IPV6, &s)?;
+            s
+        }
     };
 
-    set_ip_transparent(libc::IPPROTO_IPV6, &socket)?;
     set_ip_transparent(libc::IPPROTO_IP, &socket)?;
 
     socket.bind(addr)?;
