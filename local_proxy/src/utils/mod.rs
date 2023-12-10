@@ -1,4 +1,6 @@
 mod addr;
+mod dns;
+mod http;
 mod uri_parse;
 
 use crate::Error;
@@ -6,6 +8,8 @@ use crate::Error;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 
 pub use addr::{HostName, SocketAddr};
+pub use dns::doh_query;
+pub use http::Body;
 pub use uri_parse::ParsedUri;
 
 pub async fn copy<R, W>(mut read: R, mut write: W) -> Result<(), Error>

@@ -1,10 +1,10 @@
 use crate::{
-    utils::{HostName, ParsedUri, SocketAddr},
+    utils::{Body, HostName, ParsedUri, SocketAddr},
     Error, PROXY,
 };
 
 use base64::Engine;
-use hyper::{header::HeaderValue, Body, Request, Response};
+use hyper::{header::HeaderValue, Request, Response};
 
 pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
     send_request(request, true).await

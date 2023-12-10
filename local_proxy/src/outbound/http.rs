@@ -1,10 +1,15 @@
 use std::str::FromStr;
 
 use super::{ProxyOutBound, ProxyOutBoundDefaultMethods};
-use crate::{config::ProxyConfig, utils::SocketAddr, Connection, Error};
+use crate::{
+    config::ProxyConfig,
+    utils::{Body, SocketAddr},
+    Connection, Error,
+};
 
 use base64::Engine;
-use hyper::{Body, Request, Response, StatusCode, Uri};
+use hyper::{Request, Response, StatusCode, Uri};
+use hyper_util::rt::TokioIo;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use async_trait::async_trait;
@@ -101,7 +106,8 @@ impl ProxyOutBound for HttpProxy {
             .ok_or("")?
             .connect(proxies, &self.addr)
             .await?;
-        let (mut sender, conn) = hyper::client::conn::handshake(server).await?;
+        let server = TokioIo::new(server);
+        let (mut sender, conn) = hyper::client::conn::http1::handshake(server).await?;
         tokio::spawn(conn);
 
         let uri = Uri::builder()
@@ -127,6 +133,6 @@ impl ProxyOutBound for HttpProxy {
             tokio::spawn(Self::proxy_upgrade(client, server));
         }
 
-        Ok(response)
+        Ok(Body::convert_response(response))
     }
 }

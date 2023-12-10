@@ -1,13 +1,18 @@
 mod connect;
 pub mod http_proxy;
 
-use crate::{Error, ERROR_HTML, PROXY};
+use crate::{utils::Body, Error, ERROR_HTML, PROXY};
 
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, Server, StatusCode,
-};
 use std::time::Duration;
+use tokio::net::TcpListener;
+
+use http_body_util::Full;
+use hyper::{
+    body::{Bytes, Incoming},
+    service::service_fn,
+    Method, Request, Response, StatusCode,
+};
+use hyper_util::rt::TokioIo;
 
 pub async fn start() -> Result<(), Error> {
     let listen = PROXY.get().unwrap().config.http_listen.as_ref().ok_or("")?;
@@ -16,16 +21,20 @@ pub async fn start() -> Result<(), Error> {
     }
 
     for i in listen {
-        let server = Server::try_bind(i)?
-            .http1_only(true)
-            .http1_header_read_timeout(Duration::from_secs(15))
-            .tcp_nodelay(true)
-            .serve(make_service_fn(|_| async {
-                Ok::<_, Error>(service_fn(handle))
-            }));
+        let listener = TcpListener::bind(i).await?;
+        tokio::spawn(async move {
+            loop {
+                let client = match listener.accept().await {
+                    Ok((o, _)) => TokioIo::new(o),
+                    Err(_) => continue,
+                };
 
-        tokio::spawn(async {
-            let _ = server.await;
+                tokio::spawn(async {
+                    let _ = hyper::server::conn::http1::Builder::new()
+                        .serve_connection(client, service_fn(handle))
+                        .await;
+                });
+            }
         });
     }
 
@@ -34,7 +43,9 @@ pub async fn start() -> Result<(), Error> {
     }
 }
 
-async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {
+async fn handle(request: Request<Incoming>) -> Result<Response<Body>, Error> {
+    let request = Body::convert_request(request);
+
     let mut response = if request.method() == Method::CONNECT {
         connect::run(request).await
     } else {
@@ -47,7 +58,7 @@ async fn handle(request: Request<Body>) -> Result<Response<Body>, Error> {
             .header("connection", "keep-alive")
             .header("content-type", "text/html; charset=utf-8")
             .header("content-length", ERROR_HTML.len().to_string())
-            .body(Body::from(ERROR_HTML))?);
+            .body(Body::new(Full::new(Bytes::from(ERROR_HTML))))?);
     }
 
     response

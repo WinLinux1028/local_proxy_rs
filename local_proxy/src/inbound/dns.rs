@@ -1,9 +1,9 @@
-use crate::{inbound::http::http_proxy, Error, PROXY};
+use crate::{utils::doh_query, Error, PROXY};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 use tokio::{net::UdpSocket, sync::mpsc};
 
-use hyper::{body::HttpBody, Body, Method, Request, Uri};
+use hyper::Uri;
 
 pub async fn start() -> Result<(), Error> {
     let listen = PROXY.get().unwrap().config.dns_listen.as_ref().ok_or("")?;
@@ -56,25 +56,9 @@ async fn run(
     let proxy = PROXY.get().unwrap();
     let uri = Uri::from_str(proxy.config.doh_endpoint.as_ref().ok_or("")?)?;
 
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri(&uri)
-        .header("accept", "application/dns-message")
-        .header("content-type", "application/dns-message")
-        .header("content-length", buf.len().to_string())
-        .body(Body::from(buf))?;
+    let result = doh_query(&uri, buf).await?;
 
-    let mut response = http_proxy::send_request(request, false).await?;
-    if !response.status().is_success() {
-        return Err("".into());
-    }
-
-    let mut response_body = Vec::new();
-    while let Some(chunk) = response.body_mut().data().await {
-        response_body.extend_from_slice(chunk?.as_ref());
-    }
-
-    sender.send((response_body, from)).await?;
+    sender.send((result, from)).await?;
 
     Ok(())
 }

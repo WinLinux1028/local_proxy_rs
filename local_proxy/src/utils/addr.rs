@@ -1,4 +1,4 @@
-use crate::{inbound::http::http_proxy, Connection, DnsCacheState, Error, PROXY};
+use crate::{utils::doh_query, Connection, DnsCacheState, Error, PROXY};
 
 use std::{
     fmt::{Display, Write},
@@ -8,7 +8,7 @@ use std::{
 };
 
 use dns_parser::{QueryClass, QueryType, RData};
-use hyper::{body::HttpBody, Body, Method, Request, Uri};
+use hyper::Uri;
 
 #[derive(Clone)]
 pub struct SocketAddr {
@@ -176,24 +176,8 @@ impl HostName {
         query.add_question(domain, false, qtype, QueryClass::IN);
         let query = query.build().map_err(|_| "")?;
 
-        let request = Request::builder()
-            .method(Method::POST)
-            .uri(&uri)
-            .header("accept", "application/dns-message")
-            .header("content-type", "application/dns-message")
-            .header("content-length", query.len().to_string())
-            .body(Body::from(query))?;
-
-        let mut response = http_proxy::send_request(request, false).await?;
-        if !response.status().is_success() {
-            return Err("".into());
-        }
-
-        let mut response_body = Vec::new();
-        while let Some(chunk) = response.body_mut().data().await {
-            response_body.extend_from_slice(chunk?.as_ref());
-        }
-        let response_body = dns_parser::Packet::parse(&response_body)?;
+        let result = doh_query(&uri, query).await?;
+        let response_body = dns_parser::Packet::parse(&result)?;
 
         let mut dns_cache = proxy.dns_cache.write().await;
         if !dns_cache.contains_key(domain) {

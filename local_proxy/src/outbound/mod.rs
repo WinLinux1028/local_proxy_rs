@@ -6,18 +6,19 @@ mod socks4;
 mod socks5;
 
 pub use http::HttpProxy;
+use hyper_util::rt::TokioIo;
 pub use raw::Raw;
 pub use socks4::Socks4Proxy;
 pub use socks5::Socks5Proxy;
 
 use crate::{
     outbound::layer::Layer,
-    utils::{self, SocketAddr},
+    utils::{self, Body, SocketAddr},
     Connection, Error,
 };
 
 use async_trait::async_trait;
-use hyper::{upgrade::OnUpgrade, Body, Request, Response, StatusCode};
+use hyper::{upgrade::OnUpgrade, Request, Response, StatusCode};
 
 #[async_trait]
 pub trait ProxyOutBound: Send + Sync {
@@ -69,7 +70,8 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
         if scheme == "https" {
             server = layer::TlsClient::new().wrap(server, &addr).await?;
         }
-        let (mut sender, conn) = hyper::client::conn::handshake(server).await?;
+        let server = TokioIo::new(server);
+        let (mut sender, conn) = hyper::client::conn::http1::handshake(server).await?;
         tokio::spawn(conn);
 
         let client = hyper::upgrade::on(&mut request);
@@ -79,12 +81,12 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
             tokio::spawn(Self::proxy_upgrade(client, server));
         }
 
-        Ok(response)
+        Ok(Body::convert_response(response))
     }
 
     async fn proxy_upgrade(client: OnUpgrade, server: OnUpgrade) -> Result<(), Error> {
         let (client, server) = tokio::join!(client, server);
-        utils::copy_bidirectional(client?, server?).await;
+        utils::copy_bidirectional(TokioIo::new(client?), TokioIo::new(server?)).await;
         Ok(())
     }
 }
