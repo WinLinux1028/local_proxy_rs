@@ -11,7 +11,6 @@ pub async fn doh_query(endpoint: &Uri, query: Vec<u8>) -> Result<Vec<u8>, Error>
         .uri(endpoint)
         .header("accept", "application/dns-message")
         .header("content-type", "application/dns-message")
-        .header("content-length", query.len().to_string())
         .body(Body::new(Full::new(Bytes::from(query))))?;
 
     let mut response = http_proxy::send_request(request, false).await?;

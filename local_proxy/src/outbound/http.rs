@@ -108,7 +108,7 @@ impl ProxyOutBound for HttpProxy {
             .await?;
         let server = TokioIo::new(server);
         let (mut sender, conn) = hyper::client::conn::http1::handshake(server).await?;
-        tokio::spawn(conn);
+        tokio::spawn(conn.with_upgrades());
 
         let uri = Uri::builder()
             .scheme(scheme)

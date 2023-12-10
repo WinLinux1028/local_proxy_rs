@@ -72,7 +72,7 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
         }
         let server = TokioIo::new(server);
         let (mut sender, conn) = hyper::client::conn::http1::handshake(server).await?;
-        tokio::spawn(conn);
+        tokio::spawn(conn.with_upgrades());
 
         let client = hyper::upgrade::on(&mut request);
         let mut response = sender.send_request(request).await?;

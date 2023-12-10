@@ -32,6 +32,7 @@ pub async fn start() -> Result<(), Error> {
                 tokio::spawn(async {
                     let _ = hyper::server::conn::http1::Builder::new()
                         .serve_connection(client, service_fn(handle))
+                        .with_upgrades()
                         .await;
                 });
             }
@@ -57,7 +58,6 @@ async fn handle(request: Request<Incoming>) -> Result<Response<Body>, Error> {
             .status(StatusCode::BAD_GATEWAY)
             .header("connection", "keep-alive")
             .header("content-type", "text/html; charset=utf-8")
-            .header("content-length", ERROR_HTML.len().to_string())
             .body(Body::new(Full::new(Bytes::from(ERROR_HTML))))?);
     }
 
