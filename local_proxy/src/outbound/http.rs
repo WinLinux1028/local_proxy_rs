@@ -8,9 +8,10 @@ use crate::{
 };
 
 use base64::Engine;
-use hyper::{Request, Response, StatusCode, Uri};
+use bytes::Bytes;
+use http_body_util::Empty;
+use hyper::{Method, Request, Response, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use async_trait::async_trait;
 
@@ -50,44 +51,28 @@ impl ProxyOutBound for HttpProxy {
             .ok_or("")?
             .connect(proxies, &self.addr)
             .await?;
-        let mut server = BufReader::new(server);
 
-        server
-            .write_all(
-                format!(
-                    "CONNECT {0} HTTP/1.1\r\nHost: {0}\r\nProxy-Connection: Keep-Alive\r\n",
-                    addr
-                )
-                .as_bytes(),
-            )
-            .await?;
+        let server = TokioIo::new(server);
+        let (mut sender, conn) = hyper::client::conn::http1::handshake(server).await?;
+        tokio::spawn(conn.with_upgrades());
+
+        let addr_str = addr.to_string();
+        let mut request = Request::builder()
+            .method(Method::CONNECT)
+            .uri(&addr_str)
+            .header("host", &addr_str)
+            .header("proxy-connection", "keep-alive");
         if let Some(auth) = &self.auth {
-            server
-                .write_all(format!("Proxy-Authorization: Basic {}\r\n", auth).as_bytes())
-                .await?;
+            request = request.header("proxy-authorization", format!("Basic {}", auth));
         }
-        server.write_all(b"\r\n").await?;
-        server.flush().await?;
+        let request = request.body(Empty::<Bytes>::new())?;
 
-        let mut response = String::new();
-        if server.read_line(&mut response).await? == 0 {
-            return Err("".into());
-        }
-        let mut response_code = response.split(' ');
-        response_code.next();
-        let response_code: u16 = response_code.next().ok_or("")?.parse()?;
-        if !(200..=299).contains(&response_code) {
+        let response = sender.send_request(request).await?;
+        if !response.status().is_success() {
             return Err("".into());
         }
 
-        while response != "\r\n" {
-            response.clear();
-            if server.read_line(&mut response).await? == 0 {
-                return Err("".into());
-            }
-        }
-
-        Ok(Box::new(server))
+        Ok(Box::new(TokioIo::new(hyper::upgrade::on(response).await?)))
     }
 
     async fn http_proxy(
