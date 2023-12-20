@@ -8,6 +8,7 @@ use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Uri};
 
 pub async fn doh_query(endpoint: &Uri, mut query: Vec<u8>) -> Result<Vec<u8>, Error> {
+    let id = (*query.first().ok_or("")?, *query.get(1).ok_or("")?);
     *query.get_mut(0).ok_or("")? = 0xab;
     *query.get_mut(1).ok_or("")? = 0xcd;
     let proxy = PROXY.get().ok_or("")?;
@@ -45,6 +46,9 @@ pub async fn doh_query(endpoint: &Uri, mut query: Vec<u8>) -> Result<Vec<u8>, Er
         .write()
         .await
         .insert(query, response_body.clone(), Duration::from_secs(3600));
+
+    *response_body.get_mut(0).ok_or("")? = id.0;
+    *response_body.get_mut(1).ok_or("")? = id.1;
 
     Ok(response_body)
 }
