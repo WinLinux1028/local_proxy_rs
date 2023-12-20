@@ -13,7 +13,11 @@ pub async fn doh_query(endpoint: &Uri, mut query: Vec<u8>) -> Result<Vec<u8>, Er
     *query.get_mut(1).ok_or("")? = 0xcd;
     let proxy = PROXY.get().ok_or("")?;
     if let Some(s) = proxy.dns_cache.read().await.get(&query) {
-        return Ok(s.clone());
+        let mut result = s.clone();
+        *result.get_mut(0).ok_or("")? = id.0;
+        *result.get_mut(1).ok_or("")? = id.1;
+
+        return Ok(result);
     }
 
     let request = Request::builder()
