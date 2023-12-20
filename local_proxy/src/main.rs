@@ -8,7 +8,7 @@ mod utils;
 
 use crate::{config::Config, outbound::ProxyOutBound};
 
-use std::io::Write;
+use std::io::{Read, Write};
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     sync::RwLock,
@@ -27,8 +27,12 @@ async fn main() {
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
 
-    let mut config: Config =
-        serde_json::from_reader(std::fs::File::open("./config.json").unwrap()).unwrap();
+    let mut config = String::new();
+    std::fs::File::open("./config.json")
+        .unwrap()
+        .read_to_string(&mut config)
+        .unwrap();
+    let mut config: Config = json5::from_str(&config).unwrap();
 
     let mut proxy_stack: Vec<Box<dyn ProxyOutBound>> = vec![Box::new(outbound::Raw::new())];
     if let Some(proxies) = &mut config.proxies {
