@@ -1,10 +1,9 @@
-use crate::{utils::doh_query, Connection, DnsCacheState, Error, PROXY};
+use crate::{utils::doh_query, Connection, Error, PROXY};
 
 use std::{
     fmt::{Display, Write},
     net::{Ipv4Addr, Ipv6Addr},
     str::FromStr,
-    time::Duration,
 };
 
 use dns_parser::{QueryClass, QueryType, RData};
@@ -152,26 +151,6 @@ impl HostName {
         let proxy = PROXY.get().ok_or("")?;
         let uri = Uri::from_str(proxy.config.doh_endpoint.as_ref().ok_or("")?)?;
 
-        let dns_cache = proxy.dns_cache.read().await;
-        if let Some(cache_content) = dns_cache.get(domain) {
-            if qtype == QueryType::A {
-                match cache_content.0 {
-                    DnsCacheState::Some(s) => return Ok(s.into()),
-                    DnsCacheState::Fail => return Err("".into()),
-                    DnsCacheState::None => {}
-                }
-            } else if qtype == QueryType::AAAA {
-                match cache_content.1 {
-                    DnsCacheState::Some(s) => return Ok(s.into()),
-                    DnsCacheState::Fail => return Err("".into()),
-                    DnsCacheState::None => {}
-                }
-            } else {
-                return Err("".into());
-            }
-        }
-        drop(dns_cache);
-
         let mut query = dns_parser::Builder::new_query(0xabcd, true);
         query.add_question(domain, false, qtype, QueryClass::IN);
         let query = query.build().map_err(|_| "")?;
@@ -179,37 +158,19 @@ impl HostName {
         let result = doh_query(&uri, query).await?;
         let response_body = dns_parser::Packet::parse(&result)?;
 
-        let mut dns_cache = proxy.dns_cache.write().await;
-        if !dns_cache.contains_key(domain) {
-            dns_cache.insert(
-                domain.clone(),
-                (DnsCacheState::None, DnsCacheState::None),
-                Duration::from_secs(7200),
-            );
-        }
-        let cache_content = dns_cache.get_mut(domain).ok_or("")?;
-
         for answer in response_body.answers {
             if answer.cls != dns_parser::Class::IN {
                 continue;
             }
             match answer.data {
                 RData::A(addr) => {
-                    cache_content.0 = DnsCacheState::Some(addr.0);
                     return Ok(addr.0.into());
                 }
                 RData::AAAA(addr) => {
-                    cache_content.1 = DnsCacheState::Some(addr.0);
                     return Ok(addr.0.into());
                 }
                 _ => continue,
             }
-        }
-
-        if qtype == QueryType::A {
-            cache_content.0 = DnsCacheState::Fail;
-        } else if qtype == QueryType::AAAA {
-            cache_content.1 = DnsCacheState::Fail;
         }
         Err("".into())
     }

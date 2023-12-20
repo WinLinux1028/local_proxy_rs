@@ -8,11 +8,7 @@ mod utils;
 
 use crate::{config::Config, outbound::ProxyOutBound};
 
-use std::{
-    hash::Hash,
-    io::Write,
-    net::{Ipv4Addr, Ipv6Addr},
-};
+use std::io::Write;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     sync::RwLock,
@@ -121,14 +117,8 @@ async fn main() {
 #[allow(clippy::type_complexity)]
 struct ProxyState {
     config: Config,
-    dns_cache: RwLock<TtlCache<String, (DnsCacheState<Ipv4Addr>, DnsCacheState<Ipv6Addr>)>>,
+    dns_cache: RwLock<TtlCache<Vec<u8>, Vec<u8>>>,
     proxy_stack: Vec<Box<dyn ProxyOutBound>>,
-}
-
-enum DnsCacheState<T: Hash> {
-    Some(T),
-    Fail,
-    None,
 }
 
 pub trait Stream: AsyncRead + AsyncWrite {}
