@@ -1,5 +1,5 @@
 use crate::{
-    utils::{Body, HostName, ParsedUri, SocketAddr},
+    utils::{Body, ParsedUri, SocketAddr},
     Error, PROXY,
 };
 
@@ -75,12 +75,7 @@ pub async fn send_request(
 
     let scheme = uri.scheme().ok_or("")?.to_string();
     let hostname = uri.hostname().ok_or("")?;
-    let mut host_header;
-    if let HostName::V6(v6) = hostname {
-        host_header = format!("[{}]", v6);
-    } else {
-        host_header = hostname.to_string();
-    }
+    let mut host_header = hostname.to_string_url_style();
     if let Some(port) = uri.port {
         if (scheme == "http" && port == 80) || (scheme == "https" && port == 443) {
             uri.port = None;
@@ -109,7 +104,7 @@ pub async fn send_request(
 
     response
         .headers_mut()
-        .insert("connection", HeaderValue::from_static("keep-alive"));
+        .insert("connection", HeaderValue::from_static("Keep-Alive"));
     response.headers_mut().remove("keep-alive");
 
     Ok(response)

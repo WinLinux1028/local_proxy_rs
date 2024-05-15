@@ -56,7 +56,7 @@ async fn handle(request: Request<Incoming>) -> Result<Response<Body>, Error> {
     if response.is_err() {
         response = Ok(Response::builder()
             .status(StatusCode::BAD_GATEWAY)
-            .header("connection", "keep-alive")
+            .header("connection", "Keep-Alive")
             .header("content-type", "text/html; charset=utf-8")
             .body(Body::new(Full::new(Bytes::from(ERROR_HTML))))?);
     }

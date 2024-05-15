@@ -61,7 +61,7 @@ impl ProxyOutBound for HttpProxy {
             .method(Method::CONNECT)
             .uri(&addr_str)
             .header("host", &addr_str)
-            .header("proxy-connection", "keep-alive");
+            .header("proxy-connection", "Keep-Alive");
         if let Some(auth) = &self.auth {
             request = request.header("proxy-authorization", format!("Basic {}", auth));
         }
@@ -104,11 +104,11 @@ impl ProxyOutBound for HttpProxy {
         *request.uri_mut() = uri;
         request
             .headers_mut()
-            .insert("proxy-connection", "keep-alive".parse()?);
+            .insert("proxy-connection", "Keep-Alive".parse()?);
         if let Some(auth) = &self.auth {
             request
                 .headers_mut()
-                .insert("proxy-authorization", format!("basic {}", auth).parse()?);
+                .insert("proxy-authorization", format!("Basic {}", auth).parse()?);
         }
 
         let client = hyper::upgrade::on(&mut request);

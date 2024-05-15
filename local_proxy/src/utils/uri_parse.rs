@@ -135,11 +135,7 @@ impl TryInto<Uri> for ParsedUri {
             authority.push('@');
         }
         if let Some(hostname) = self.hostname {
-            if let HostName::V6(v6) = hostname {
-                authority.push_str(&format!("[{}]", v6));
-            } else {
-                authority.push_str(&hostname.to_string());
-            }
+            authority.push_str(&hostname.to_string_url_style());
 
             if let Some(port) = self.port {
                 authority.push(':');

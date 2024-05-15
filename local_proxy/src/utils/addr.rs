@@ -174,6 +174,13 @@ impl HostName {
         }
         Err("".into())
     }
+
+    pub fn to_string_url_style(&self) -> String {
+        match self {
+            Self::V6(v6) => format!("[{}]", v6),
+            _ => self.to_string(),
+        }
+    }
 }
 
 impl Display for HostName {

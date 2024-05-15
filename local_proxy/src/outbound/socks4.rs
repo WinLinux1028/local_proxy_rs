@@ -48,6 +48,10 @@ impl ProxyOutBound for Socks4Proxy {
         let mut hostname = None;
         match &addr.hostname {
             HostName::V4(v4) => ip = *v4,
+            HostName::V6(v6) => {
+                ip = Ipv4Addr::new(0, 0, 0, 1);
+                hostname = Some(format!("[{}]", v6));
+            }
             HostName::Domain(domain) => {
                 ip = Ipv4Addr::new(0, 0, 0, 1);
                 if domain.contains('\0') {
@@ -55,7 +59,6 @@ impl ProxyOutBound for Socks4Proxy {
                 }
                 hostname = Some(domain.clone());
             }
-            HostName::V6(_) => return Err("".into()),
         }
 
         let ip_octet = ip.octets();
