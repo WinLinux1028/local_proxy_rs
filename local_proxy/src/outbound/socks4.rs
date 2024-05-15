@@ -47,10 +47,16 @@ impl ProxyOutBound for Socks4Proxy {
         let ip;
         let mut hostname = None;
         match &addr.hostname {
-            HostName::V4(v4) => ip = *v4,
+            HostName::V4(v4) => {
+                let v4_integer = u32::from_be_bytes(v4.octets());
+                if v4_integer & 0xFFFFFF00 == 0 && v4_integer & 0xFF != 0 {
+                    return Err("".into());
+                }
+                ip = *v4
+            }
             HostName::V6(v6) => {
                 ip = Ipv4Addr::new(0, 0, 0, 1);
-                hostname = Some(format!("[{}]", v6));
+                hostname = Some(v6.to_string());
             }
             HostName::Domain(domain) => {
                 ip = Ipv4Addr::new(0, 0, 0, 1);
@@ -61,16 +67,6 @@ impl ProxyOutBound for Socks4Proxy {
             }
         }
 
-        let ip_octet = ip.octets();
-        if hostname.is_none()
-            && ip_octet[0] == 0
-            && ip_octet[1] == 0
-            && ip_octet[2] == 0
-            && ip_octet[3] != 0
-        {
-            return Err("".into());
-        }
-
         let mut server = proxies
             .next()
             .ok_or("")?
@@ -79,7 +75,7 @@ impl ProxyOutBound for Socks4Proxy {
 
         server.write_all(&[4, 1]).await?;
         server.write_all(&addr.port.to_be_bytes()).await?;
-        server.write_all(&ip_octet).await?;
+        server.write_all(&ip.octets()).await?;
         if let Some(auth) = &self.auth {
             server.write_all(auth.as_bytes()).await?
         }
