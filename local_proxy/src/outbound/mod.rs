@@ -5,6 +5,8 @@ mod raw;
 mod socks4;
 mod socks5;
 
+use dns_parser::QueryType;
+use dyn_clone::DynClone;
 pub use http::HttpProxy;
 use hyper_util::rt::TokioIo;
 pub use raw::Raw;
@@ -24,13 +26,13 @@ use hyper::{upgrade::OnUpgrade, Request, Response, StatusCode};
 pub trait ProxyOutBound: Send + Sync {
     async fn connect(
         &self,
-        proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
+        proxies: ProxyStack<'_>,
         addr: &SocketAddr,
     ) -> Result<Connection, Error>;
 
     async fn http_proxy(
         &self,
-        proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
+        proxies: ProxyStack<'_>,
         scheme: &str,
         use_doh: bool,
         request: Request<Body>,
@@ -41,9 +43,41 @@ pub trait ProxyOutBound: Send + Sync {
 
 #[async_trait]
 pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
+    async fn happy_eyeballs(
+        &self,
+        proxies: ProxyStack<'_>,
+        addr: &SocketAddr,
+    ) -> Result<Connection, Error> {
+        let conn;
+        tokio::select! {
+            Ok(conn_) = async {
+                let ip = addr.hostname.dns_resolve(QueryType::AAAA).await?;
+                let addr = SocketAddr::new(ip, addr.port);
+                let proxies = dyn_clone::clone_box(&*proxies);
+                let conn = self.connect(proxies, &addr).await?;
+                Ok::<_, Error>(conn)
+            } => conn = conn_,
+            Ok(conn_) = async {
+                let ip = addr.hostname.dns_resolve(QueryType::A).await?;
+                let addr = SocketAddr::new(ip, addr.port);
+                let proxies = dyn_clone::clone_box(&*proxies);
+                let conn = self.connect(proxies, &addr).await?;
+                Ok::<_, Error>(conn)
+            } => conn = conn_,
+            else => {
+                let proxies = dyn_clone::clone_box(&*proxies);
+                conn = self
+                    .connect(proxies, addr)
+                    .await?;
+            }
+        }
+
+        Ok(conn)
+    }
+
     async fn http_proxy_(
         &self,
-        proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
+        proxies: ProxyStack<'_>,
         scheme: &str,
         use_doh: bool,
         mut request: Request<Body>,
@@ -62,7 +96,7 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
 
         let mut server;
         if use_doh {
-            server = addr.happy_eyeballs().await?;
+            server = self.happy_eyeballs(proxies, &addr).await?;
         } else {
             server = self.connect(proxies, &addr).await?;
         }
@@ -91,3 +125,7 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
     }
 }
 impl<P> ProxyOutBoundDefaultMethods for P where P: ProxyOutBound + ?Sized {}
+
+pub type ProxyStack<'a> = Box<dyn ClonableIterator<Item = &'a dyn ProxyOutBound> + Send + Sync>;
+pub trait ClonableIterator: Iterator + DynClone {}
+impl<T: Iterator + DynClone> ClonableIterator for T {}

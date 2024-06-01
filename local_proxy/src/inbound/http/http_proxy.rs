@@ -95,11 +95,11 @@ pub async fn send_request(
     *request.uri_mut() = uri.try_into()?;
 
     let proxy = PROXY.get().ok_or("")?;
-    let mut proxies = proxy.proxy_stack.iter().rev();
+    let mut proxies = Box::new(proxy.proxy_stack.iter().map(|p| &**p).rev());
     let mut response = proxies
         .next()
         .ok_or("")?
-        .http_proxy(Box::new(proxies), &scheme, use_doh, request)
+        .http_proxy(proxies, &scheme, use_doh, request)
         .await?;
 
     response

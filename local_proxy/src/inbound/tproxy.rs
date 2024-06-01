@@ -56,12 +56,9 @@ where
 {
     let addr: SocketAddr = client.destination_addr(redir_type)?.into();
 
-    let mut proxies = PROXY.get().unwrap().proxy_stack.iter().rev();
-    let server_conn = proxies
-        .next()
-        .ok_or("")?
-        .connect(Box::new(proxies), &addr)
-        .await?;
+    let proxy = PROXY.get().ok_or("")?;
+    let mut proxies = Box::new(proxy.proxy_stack.iter().map(|p| &**p).rev());
+    let server_conn = proxies.next().ok_or("")?.connect(proxies, &addr).await?;
 
     utils::copy_bidirectional(client, server_conn).await;
 

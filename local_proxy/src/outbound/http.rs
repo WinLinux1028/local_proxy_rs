@@ -3,6 +3,7 @@ use std::str::FromStr;
 use super::{ProxyOutBound, ProxyOutBoundDefaultMethods};
 use crate::{
     config::ProxyConfig,
+    outbound::ProxyStack,
     utils::{Body, SocketAddr},
     Connection, Error,
 };
@@ -43,7 +44,7 @@ impl HttpProxy {
 impl ProxyOutBound for HttpProxy {
     async fn connect(
         &self,
-        mut proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
+        mut proxies: ProxyStack<'_>,
         addr: &SocketAddr,
     ) -> Result<Connection, Error> {
         let server = proxies
@@ -77,7 +78,7 @@ impl ProxyOutBound for HttpProxy {
 
     async fn http_proxy(
         &self,
-        mut proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
+        mut proxies: ProxyStack<'_>,
         scheme: &str,
         use_doh: bool,
         mut request: Request<Body>,

@@ -1,6 +1,7 @@
 use super::ProxyOutBound;
 use crate::{
     config::ProxyConfig,
+    outbound::ProxyStack,
     utils::{HostName, SocketAddr},
     Connection, Error,
 };
@@ -46,7 +47,7 @@ impl Socks5Proxy {
 impl ProxyOutBound for Socks5Proxy {
     async fn connect(
         &self,
-        mut proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
+        mut proxies: ProxyStack<'_>,
         addr: &SocketAddr,
     ) -> Result<Connection, Error> {
         let mut server = proxies

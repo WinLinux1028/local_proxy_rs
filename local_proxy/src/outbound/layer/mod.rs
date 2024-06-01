@@ -3,7 +3,7 @@ mod tls;
 pub use tls::TlsClient;
 
 use super::ProxyOutBound;
-use crate::{utils::SocketAddr, Connection, Error};
+use crate::{outbound::ProxyStack, utils::SocketAddr, Connection, Error};
 
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -22,7 +22,7 @@ where
 {
     async fn connect(
         &self,
-        mut proxies: Box<dyn Iterator<Item = &Box<dyn ProxyOutBound>> + Send>,
+        mut proxies: ProxyStack<'_>,
         addr: &SocketAddr,
     ) -> Result<Connection, Error> {
         let server = proxies.next().ok_or("")?.connect(proxies, addr).await?;

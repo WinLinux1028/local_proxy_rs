@@ -1,4 +1,4 @@
-use crate::{utils::doh_query, Connection, Error, PROXY};
+use crate::{utils::doh_query, Error, PROXY};
 
 use std::{
     fmt::{Display, Write},
@@ -34,38 +34,6 @@ impl SocketAddr {
 
         let hostname = HostName::from_str(hostname)?;
         Ok((hostname, port))
-    }
-
-    pub async fn happy_eyeballs(&self) -> Result<Connection, Error> {
-        let proxy = PROXY.get().ok_or("")?;
-
-        let conn;
-        tokio::select! {
-            Ok(conn_) = async {
-                let ip = self.hostname.dns_resolve(QueryType::AAAA).await?;
-                let addr = SocketAddr::new(ip, self.port);
-                let mut proxies = proxy.proxy_stack.iter().rev();
-                let conn = proxies.next().ok_or("")?.connect(Box::new(proxies), &addr).await?;
-                Ok::<_, Error>(conn)
-            } => conn = conn_,
-            Ok(conn_) = async {
-                let ip = self.hostname.dns_resolve(QueryType::A).await?;
-                let addr = SocketAddr::new(ip, self.port);
-                let mut proxies = proxy.proxy_stack.iter().rev();
-                let conn = proxies.next().ok_or("")?.connect(Box::new(proxies), &addr).await?;
-                Ok::<_, Error>(conn)
-            } => conn = conn_,
-            else => {
-                let mut proxies = proxy.proxy_stack.iter().rev();
-                conn = proxies
-                    .next()
-                    .ok_or("")?
-                    .connect(Box::new(proxies), self)
-                    .await?;
-            }
-        }
-
-        Ok(conn)
     }
 }
 

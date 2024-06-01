@@ -1,6 +1,7 @@
 use crate::{
+    outbound::ProxyOutBoundDefaultMethods,
     utils::{self, Body, SocketAddr},
-    Error,
+    Error, PROXY,
 };
 
 use std::str::FromStr;
@@ -12,7 +13,14 @@ use hyper_util::rt::TokioIo;
 
 pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
     let server = SocketAddr::from_str(&request.uri().to_string())?;
-    let server_conn = server.happy_eyeballs().await?;
+
+    let proxy = PROXY.get().ok_or("")?;
+    let mut proxies = Box::new(proxy.proxy_stack.iter().map(|p| &**p).rev());
+    let server_conn = proxies
+        .next()
+        .ok_or("")?
+        .happy_eyeballs(proxies, &server)
+        .await?;
 
     tokio::spawn(async {
         let client = TokioIo::new(hyper::upgrade::on(request).await?);
