@@ -3,6 +3,7 @@ use std::str::FromStr;
 use super::{ProxyOutBound, ProxyOutBoundDefaultMethods};
 use crate::{
     config::ProxyConfig,
+    inbound::http::http_proxy::RequestConfig,
     outbound::ProxyStack,
     utils::{Body, SocketAddr},
     Connection, Error,
@@ -80,11 +81,11 @@ impl ProxyOutBound for HttpProxy {
         &self,
         mut proxies: ProxyStack<'_>,
         scheme: &str,
-        use_doh: bool,
+        req_conf: &RequestConfig,
         mut request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
         if scheme != "http" {
-            return self.http_proxy_(proxies, scheme, use_doh, request).await;
+            return self.http_proxy_(proxies, scheme, req_conf, request).await;
         }
 
         let server = proxies

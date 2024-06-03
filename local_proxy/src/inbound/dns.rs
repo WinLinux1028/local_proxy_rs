@@ -1,9 +1,7 @@
 use crate::{utils::doh_query, Error, PROXY};
 
-use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::UdpSocket, sync::mpsc};
-
-use hyper::Uri;
 
 pub async fn start() -> Result<(), Error> {
     let listen = PROXY.get().unwrap().config.dns_listen.as_ref().ok_or("")?;
@@ -53,10 +51,7 @@ async fn run(
     from: SocketAddr,
     sender: &mpsc::Sender<(Vec<u8>, SocketAddr)>,
 ) -> Result<(), Error> {
-    let proxy = PROXY.get().unwrap();
-    let uri = Uri::from_str(proxy.config.doh_endpoint.as_ref().ok_or("")?)?;
-
-    let result = doh_query(&uri, buf).await?;
+    let result = doh_query(buf).await?;
 
     sender.send((result, from)).await?;
 

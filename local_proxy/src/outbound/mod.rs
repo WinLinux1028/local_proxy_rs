@@ -14,6 +14,7 @@ pub use socks4::Socks4Proxy;
 pub use socks5::Socks5Proxy;
 
 use crate::{
+    inbound::http::http_proxy::RequestConfig,
     outbound::layer::Layer,
     utils::{self, Body, SocketAddr},
     Connection, Error,
@@ -34,10 +35,10 @@ pub trait ProxyOutBound: Send + Sync {
         &self,
         proxies: ProxyStack<'_>,
         scheme: &str,
-        use_doh: bool,
+        req_conf: &RequestConfig,
         request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
-        self.http_proxy_(proxies, scheme, use_doh, request).await
+        self.http_proxy_(proxies, scheme, req_conf, request).await
     }
 }
 
@@ -79,7 +80,7 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
         &self,
         proxies: ProxyStack<'_>,
         scheme: &str,
-        use_doh: bool,
+        req_conf: &RequestConfig,
         mut request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
         let host = request.headers().get("host").ok_or("")?.to_str()?;
@@ -93,12 +94,16 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
             },
         };
         let addr = SocketAddr::new(hostname, port);
+        let fake_addr = SocketAddr::new(
+            req_conf.fake_host.clone().unwrap_or(addr.hostname.clone()),
+            addr.port,
+        );
 
         let mut server;
-        if use_doh {
-            server = self.happy_eyeballs(proxies, &addr).await?;
+        if req_conf.doh {
+            server = self.happy_eyeballs(proxies, &fake_addr).await?;
         } else {
-            server = self.connect(proxies, &addr).await?;
+            server = self.connect(proxies, &fake_addr).await?;
         }
 
         if scheme == "https" {

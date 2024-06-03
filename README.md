@@ -15,8 +15,8 @@
 `cargo run --release`とすると最適化されます <br />
 
 ## 設定
-config.jsonをカレントディレクトリに置いてください <br />
-例はconfig.json.exampleにあります <br />
+config.json5をカレントディレクトリに置いてください <br />
+例はconfig_example.json5にあります <br />
 <br />
 上流のプロキシが指定されている場合､起動するとユーザー名とパスワードを聞かれた後､画面がクリアされます <br />
 

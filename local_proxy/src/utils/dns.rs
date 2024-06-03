@@ -1,13 +1,16 @@
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
-use super::Body;
-use crate::{inbound::http::http_proxy, Error, PROXY};
+use super::{Body, HostName};
+use crate::{
+    inbound::http::http_proxy::{self, RequestConfig},
+    Error, PROXY,
+};
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Uri};
 
-pub async fn doh_query(endpoint: &Uri, mut query: Vec<u8>) -> Result<Vec<u8>, Error> {
+pub async fn doh_query(mut query: Vec<u8>) -> Result<Vec<u8>, Error> {
     let id = (*query.first().ok_or("")?, *query.get(1).ok_or("")?);
     *query.get_mut(0).ok_or("")? = 0xab;
     *query.get_mut(1).ok_or("")? = 0xcd;
@@ -20,6 +23,10 @@ pub async fn doh_query(endpoint: &Uri, mut query: Vec<u8>) -> Result<Vec<u8>, Er
         return Ok(result);
     }
 
+    let proxy = PROXY.get().unwrap();
+    let doh_config = proxy.config.doh.as_ref().ok_or("")?;
+    let endpoint = Uri::from_str(&doh_config.endpoint)?;
+
     let request = Request::builder()
         .method(Method::POST)
         .uri(endpoint)
@@ -27,7 +34,15 @@ pub async fn doh_query(endpoint: &Uri, mut query: Vec<u8>) -> Result<Vec<u8>, Er
         .header("content-type", "application/dns-message")
         .body(Body::new(Full::new(Bytes::copy_from_slice(&query))))?;
 
-    let mut response = http_proxy::send_request(request, false).await?;
+    let mut req_conf = RequestConfig::new();
+    req_conf.doh = false;
+    req_conf.fake_host = doh_config
+        .fake_host
+        .as_ref()
+        .map(|f| HostName::from_str(f))
+        .ok_or("")?
+        .ok();
+    let mut response = http_proxy::send_request(request, &req_conf).await?;
     if !response.status().is_success() {
         return Err("".into());
     }

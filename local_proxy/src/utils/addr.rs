@@ -1,4 +1,4 @@
-use crate::{utils::doh_query, Error, PROXY};
+use crate::{utils::doh_query, Error};
 
 use std::{
     fmt::{Display, Write},
@@ -7,7 +7,6 @@ use std::{
 };
 
 use dns_parser::{QueryClass, QueryType, RData};
-use hyper::Uri;
 
 #[derive(Clone)]
 pub struct SocketAddr {
@@ -116,14 +115,11 @@ impl HostName {
             _ => return Err("".into()),
         };
 
-        let proxy = PROXY.get().ok_or("")?;
-        let uri = Uri::from_str(proxy.config.doh_endpoint.as_ref().ok_or("")?)?;
-
         let mut query = dns_parser::Builder::new_query(0xabcd, true);
         query.add_question(domain, false, qtype, QueryClass::IN);
         let query = query.build().map_err(|_| "")?;
 
-        let result = doh_query(&uri, query).await?;
+        let result = doh_query(query).await?;
         let response_body = dns_parser::Packet::parse(&result)?;
 
         for answer in response_body.answers {

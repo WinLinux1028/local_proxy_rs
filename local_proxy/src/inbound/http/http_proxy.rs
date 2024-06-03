@@ -1,5 +1,5 @@
 use crate::{
-    utils::{Body, ParsedUri, SocketAddr},
+    utils::{Body, HostName, ParsedUri, SocketAddr},
     Error, PROXY,
 };
 
@@ -7,12 +7,12 @@ use base64::Engine;
 use hyper::{header::HeaderValue, Request, Response};
 
 pub async fn run(request: Request<Body>) -> Result<Response<Body>, Error> {
-    send_request(request, true).await
+    send_request(request, &RequestConfig::new()).await
 }
 
 pub async fn send_request(
     mut request: Request<Body>,
-    use_doh: bool,
+    req_conf: &RequestConfig,
 ) -> Result<Response<Body>, Error> {
     let mut uri: ParsedUri = request.uri().clone().try_into()?;
 
@@ -99,7 +99,7 @@ pub async fn send_request(
     let mut response = proxies
         .next()
         .ok_or("")?
-        .http_proxy(proxies, &scheme, use_doh, request)
+        .http_proxy(proxies, &scheme, req_conf, request)
         .await?;
 
     response
@@ -108,4 +108,18 @@ pub async fn send_request(
     response.headers_mut().remove("keep-alive");
 
     Ok(response)
+}
+
+pub struct RequestConfig {
+    pub doh: bool,
+    pub fake_host: Option<HostName>,
+}
+
+impl RequestConfig {
+    pub fn new() -> Self {
+        RequestConfig {
+            doh: true,
+            fake_host: None,
+        }
+    }
 }

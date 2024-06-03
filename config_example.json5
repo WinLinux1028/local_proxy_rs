@@ -1,0 +1,31 @@
+{
+    "proxies": [
+        {
+            // layer+layer+...+protocol
+            // layer supported: tls
+            // protocol supported: http, socks4, socks5
+            "protocol": "tls+tls+http", // This is required.
+
+            "server": "114.51.48.10:1919", // This is required.
+            "user": "foo", // When this is set, you can skip entering authorization credential.
+            "password": "bar",
+        }
+    ],
+    "doh": {
+        "endpoint": "https://cloudflare-dns.com/dns-query", // This is required.
+
+        // When this is set, this app requests the proxy server to connect its host.
+        // But SNI and HTTP Host header are set to "endpoint"'s host name.
+        // This is useful when the proxy server blocking to access to DoH server.
+        // If "endpoint" is set cloudflare-dns.com, you have to set this the host name proxied by Cloudflare.
+        // ex. hakurei.win, tkngh.jp, gazeta-pravda.ru, discord.com, misskey.io, 
+        "fake_host": "hakurei.win",
+    },
+    "http_listen": ["127.0.0.1:8080", "[::1]:8080"],
+    "dns_listen": ["127.0.0.1:8081", "[::1]:8081"],
+
+    "tproxy_listen": {
+        "listen": ["127.0.0.1:8081", "[::1]:8081"], // This is required.
+        "redir_type": "redirect", // redirect, tproxy, pf, ipfw
+    },
+}

@@ -28,7 +28,7 @@ async fn main() {
     let mut stdout = std::io::stdout();
 
     let mut config = String::new();
-    std::fs::File::open("./config.json")
+    std::fs::File::open("./config.json5")
         .unwrap()
         .read_to_string(&mut config)
         .unwrap();
@@ -91,7 +91,7 @@ async fn main() {
         }
     }
 
-    let dns_cache = if config.doh_endpoint.is_some() {
+    let dns_cache = if config.doh.is_some() {
         TtlCache::new(65535)
     } else {
         TtlCache::new(0)
