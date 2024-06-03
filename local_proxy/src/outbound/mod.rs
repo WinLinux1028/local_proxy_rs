@@ -17,7 +17,7 @@ use crate::{
     inbound::http::http_proxy::RequestConfig,
     outbound::layer::Layer,
     utils::{self, Body, SocketAddr},
-    Connection, Error,
+    Connection, Error, PROXY,
 };
 
 use async_trait::async_trait;
@@ -49,6 +49,12 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
         proxies: ProxyStack<'_>,
         addr: &SocketAddr,
     ) -> Result<Connection, Error> {
+        let proxy = PROXY.get().ok_or("")?;
+        if proxy.config.doh.is_none() {
+            let proxies = dyn_clone::clone_box(&*proxies);
+            return self.connect(proxies, addr).await;
+        }
+
         let conn;
         tokio::select! {
             Ok(conn_) = async {
