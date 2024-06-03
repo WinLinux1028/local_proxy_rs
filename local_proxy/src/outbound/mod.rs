@@ -51,7 +51,6 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
     ) -> Result<Connection, Error> {
         let proxy = PROXY.get().ok_or("")?;
         if proxy.config.doh.is_none() {
-            let proxies = dyn_clone::clone_box(&*proxies);
             return self.connect(proxies, addr).await;
         }
 
@@ -73,7 +72,6 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
             } => conn = conn_,
             else => {
                 eprintln!("[Warning] DoH failed and fallbacked to DoH disable.");
-                let proxies = dyn_clone::clone_box(&*proxies);
                 conn = self
                     .connect(proxies, addr)
                     .await?;
