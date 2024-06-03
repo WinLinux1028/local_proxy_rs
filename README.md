@@ -24,7 +24,10 @@ config.json5をカレントディレクトリに置いてください <br />
 Linux環境で <br />
 ```json
 {
-    "doh_endpoint": "https://1.1.1.1/dns-query",
+    "doh": {
+        "endpoint": "https://cloudflare-dns.com/dns-query",
+        "fake_host": "hakurei.win",
+    },
     "http_listen": ["127.0.0.1:8080", "[::1]:8080"],
     "dns_listen": ["127.0.0.1:8081", "[::1]:8081"],
     "tproxy_listen": {
