@@ -109,7 +109,7 @@ pub enum HostName {
 }
 
 impl HostName {
-    pub async fn dns_resolve(&self, qtype: QueryType) -> Result<Self, Error> {
+    pub async fn dns_resolve(&self, qtype: QueryType) -> Result<Option<Self>, Error> {
         let domain = match self {
             Self::Domain(domain) => domain,
             _ => return Err("".into()),
@@ -128,21 +128,29 @@ impl HostName {
             }
             match answer.data {
                 RData::A(addr) => {
-                    return Ok(addr.0.into());
+                    return Ok(Some(addr.0.into()));
                 }
                 RData::AAAA(addr) => {
-                    return Ok(addr.0.into());
+                    return Ok(Some(addr.0.into()));
                 }
                 _ => continue,
             }
         }
-        Err("".into())
+        Ok(None)
     }
 
     pub fn to_string_url_style(&self) -> String {
         match self {
             Self::V6(v6) => format!("[{}]", v6),
             _ => self.to_string(),
+        }
+    }
+
+    pub fn is_ipaddr(&self) -> bool {
+        match self {
+            Self::V4(_) => true,
+            Self::V6(_) => true,
+            Self::Domain(_) => false,
         }
     }
 }

@@ -50,28 +50,34 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
         addr: &SocketAddr,
     ) -> Result<Connection, Error> {
         let proxy = PROXY.get().ok_or("")?;
-        if proxy.config.doh.is_none() {
+        if proxy.config.doh.is_none() || addr.hostname.is_ipaddr() {
             return self.connect(proxies, addr).await;
         }
 
+        let mut doh_failed_v6 = true;
+        let mut doh_failed_v4 = true;
         let conn;
         tokio::select! {
             Ok(conn_) = async {
                 let ip = addr.hostname.dns_resolve(QueryType::AAAA).await?;
-                let addr = SocketAddr::new(ip, addr.port);
+                doh_failed_v6 = false;
+                let addr = SocketAddr::new(ip.ok_or("")?, addr.port);
                 let proxies = dyn_clone::clone_box(&*proxies);
                 let conn = self.connect(proxies, &addr).await?;
                 Ok::<_, Error>(conn)
             } => conn = conn_,
             Ok(conn_) = async {
                 let ip = addr.hostname.dns_resolve(QueryType::A).await?;
-                let addr = SocketAddr::new(ip, addr.port);
+                doh_failed_v4 = false;
+                let addr = SocketAddr::new(ip.ok_or("")?, addr.port);
                 let proxies = dyn_clone::clone_box(&*proxies);
                 let conn = self.connect(proxies, &addr).await?;
                 Ok::<_, Error>(conn)
             } => conn = conn_,
             else => {
-                eprintln!("[Warning] DoH failed and fallbacked to DoH disable.");
+                if doh_failed_v6 || doh_failed_v4 {
+                    eprintln!("[Warning] DoH failed and fallbacked to DoH disable.");
+                }
                 conn = self
                     .connect(proxies, addr)
                     .await?;
