@@ -56,20 +56,17 @@ impl TryFrom<Uri> for ParsedUri {
         }
 
         if let Some(authority) = value.authority() {
-            let auth: Vec<&str> = authority.as_str().split('@').collect();
             let host;
-            if auth.len() == 1 {
-                host = auth[0];
-            } else if auth.len() == 2 {
-                host = auth[1];
-                if let Some((user_, password_)) = auth[0].split_once(':') {
+            if let Some((auth, host_)) = authority.as_str().rsplit_once('@') {
+                host = host_;
+                if let Some((user_, password_)) = auth.split_once(':') {
                     user = Some(percent_decode_str(user_).decode_utf8()?.to_string());
                     password = Some(percent_decode_str(password_).decode_utf8()?.to_string());
                 } else {
-                    user = Some(percent_decode_str(auth[0]).decode_utf8()?.to_string());
+                    user = Some(percent_decode_str(auth).decode_utf8()?.to_string());
                 }
             } else {
-                return Err("".into());
+                host = authority.as_str();
             }
 
             let (hostname_, port_) = SocketAddr::parse_host_header(host)?;
