@@ -36,12 +36,10 @@ pub async fn doh_query(mut query: Vec<u8>) -> Result<Vec<u8>, Error> {
 
     let mut req_conf = RequestConfig::new();
     req_conf.doh = false;
-    req_conf.fake_host = doh_config
-        .fake_host
-        .as_ref()
-        .map(|f| HostName::from_str(f))
-        .ok_or("")?
-        .ok();
+    req_conf.fake_host = match &doh_config.fake_host {
+        Some(f) => HostName::from_str(f).ok(),
+        _ => None,
+    };
     let mut response = http_proxy::send_request(request, &req_conf).await?;
     if !response.status().is_success() {
         return Err("".into());
