@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub proxies: Option<Vec<ProxyConfig>>,
     pub doh: Option<DoHConfig>,
+    pub fragment: Option<bool>,
     pub http_listen: Option<Vec<SocketAddr>>,
     pub tproxy_listen: Option<TProxy>,
     pub dns_listen: Option<Vec<SocketAddr>>,

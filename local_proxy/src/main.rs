@@ -91,6 +91,11 @@ async fn main() {
         }
     }
 
+    proxy_stack.push(Box::new(outbound::layer::Fragment::new()));
+    if let Some(false) = config.fragment {
+        proxy_stack.pop();
+    }
+
     let dns_cache = if config.doh.is_some() {
         TtlCache::new(65535)
     } else {

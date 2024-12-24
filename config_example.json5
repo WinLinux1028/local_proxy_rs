@@ -21,6 +21,7 @@
         // ex. hakurei.win, tkngh.jp, gazeta-pravda.ru, discord.com, misskey.io, 
         "fake_host": "hakurei.win",
     },
+    "fragment": true, // If this is false, the ClientHello will not be sent fragmented.
     "http_listen": ["127.0.0.1:8080", "[::1]:8080"],
     "dns_listen": ["127.0.0.1:8081", "[::1]:8081"],
 

@@ -47,3 +47,9 @@ sudo ip6tables -t nat -A OUTPUT -m tcp -p tcp -m owner --uid-owner 1000 -j DNAT 
 sudo iptables -t nat -A OUTPUT -m udp -p udp --dport 53 -m owner --uid-owner 1000 -j DNAT --to-destination 127.0.0.1:8081
 sudo ip6tables -t nat -A OUTPUT -m udp -p udp --dport 53 -m owner --uid-owner 1000 -j DNAT --to-destination '[::1]:8081'
 ```
+
+# トラブルシューティング
+## 一部のサイトだけ繋がらない
+このソフトウェアはデフォルトでTLS ClientHelloを断片化して送信することで検閲を回避するように設計されています. <br />
+しかし, 一部のサーバーは断片化されたClientHelloを正しく処理出来ないため, そのようなサーバーに接続する場合はこの機能を無効にする必要があります. <br />
+この機能を無効にするには`config.json5`に`"fragment": false`を追記してください. <br />
