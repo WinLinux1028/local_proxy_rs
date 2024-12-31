@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Error, ErrorKind},
+    io::{self, Error},
     mem,
     net::SocketAddr,
     os::fd::AsRawFd,
@@ -26,18 +26,13 @@ pub fn create_tproxy_listener(addr: SocketAddr) -> io::Result<TcpListener> {
     Ok(listener)
 }
 
-pub fn set_ip_transparent(level: libc::c_int, socket: &TcpSocket) -> io::Result<()> {
+fn set_ip_transparent(level: libc::c_int, socket: &TcpSocket) -> io::Result<()> {
     let fd = socket.as_raw_fd();
 
     let opt = match level {
         libc::IPPROTO_IP => libc::IP_TRANSPARENT,
         libc::IPPROTO_IPV6 => libc::IPV6_TRANSPARENT,
-        _ => {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "level can only be IPPROTO_IP and IPPROTO_IPV6",
-            ))
-        }
+        _ => unreachable!("level can only be IPPROTO_IP and IPPROTO_IPV6"),
     };
 
     let enable: libc::c_int = 1;

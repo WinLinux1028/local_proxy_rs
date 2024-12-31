@@ -13,7 +13,7 @@ use async_trait::async_trait;
 
 #[async_trait]
 impl TcpListenerRedirExt for TcpListener {
-    async fn bind_redir(ty: RedirType, addr: SocketAddr) -> Result<TcpListener, Error> {
+    async fn bind_redir(ty: RedirType, addr: SocketAddr) -> io::Result<TcpListener> {
         match ty {
             RedirType::Redirect => {
                 // REDIRECT rule doesn't need to set IP_TRANSPARENT
@@ -41,10 +41,7 @@ impl TcpStreamRedirExt for TcpStream {
                 // For TPROXY, uses getsockname() to retrieve original destination address
                 self.local_addr()
             }
-            _ => Err(Error::new(
-                ErrorKind::InvalidInput,
-                "not supported tcp transparent proxy type",
-            )),
+            _ => unreachable!("not supported tcp transparent proxy type"),
         }
     }
 }

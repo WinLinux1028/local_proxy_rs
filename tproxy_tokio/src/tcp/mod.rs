@@ -23,15 +23,19 @@ use tokio::net::TcpListener;
 use async_trait::async_trait;
 use cfg_if::cfg_if;
 
-/// Extension function for `TcpListener` for setting extra options before `bind()`  
+/// Extension function for `TcpListener` for setting extra options before `bind()`
 #[async_trait]
 pub trait TcpListenerRedirExt {
-    /// Create a TcpListener for transparent proxy  
+    // Create a TcpListener for transparent proxy
+    //
+    // Implementation is platform dependent
     async fn bind_redir(ty: RedirType, addr: SocketAddr) -> io::Result<TcpListener>;
 }
 
-/// Extension function for `TcpStream` for reading original destination address  
+/// Extension function for `TcpStream` for reading original destination address
 pub trait TcpStreamRedirExt {
-    /// Read destination address for TcpStream  
+    // Read destination address for TcpStream
+    //
+    // Implementation is platform dependent
     fn destination_addr(&self, ty: RedirType) -> io::Result<SocketAddr>;
 }

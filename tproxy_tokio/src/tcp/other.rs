@@ -13,7 +13,7 @@ impl TcpListenerRedirExt for TcpListener {
     async fn bind_redir(_ty: RedirType, _addr: SocketAddr) -> io::Result<TcpListener> {
         let err = Error::new(
             ErrorKind::InvalidInput,
-            "not supported tcp transparent proxy on this platform",
+            "not supported tcp transparent proxy on Windows",
         );
         Err(err)
     }
@@ -21,6 +21,6 @@ impl TcpListenerRedirExt for TcpListener {
 
 impl TcpStreamRedirExt for TcpStream {
     fn destination_addr(&self, _ty: RedirType) -> io::Result<SocketAddr> {
-        unreachable!("not supported tcp transparent on this platform")
+        unreachable!("not supported tcp transparent on Windows")
     }
 }
