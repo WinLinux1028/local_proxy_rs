@@ -1,4 +1,5 @@
 use crate::{
+    outbound::{layer::Fragment, ProxyOutBound},
     utils::{Body, HostName, ParsedUri, SocketAddr},
     Error, PROXY,
 };
@@ -93,7 +94,19 @@ pub async fn send_request(
     *request.uri_mut() = uri.try_into()?;
 
     let proxy = PROXY.get().ok_or("")?;
-    let mut proxies = Box::new(proxy.proxy_stack.iter().map(|p| &**p).rev());
+    let mut proxies: Vec<&Box<dyn ProxyOutBound>> = proxy.proxy_stack.iter().collect();
+    let fragment_layer: Box<dyn ProxyOutBound> = Box::new(Fragment::new());
+    if let Some(fragment) = req_conf.fragment {
+        if let Some(2..) | None = proxy.config.fragment {
+            if !fragment {
+                proxies.pop();
+            }
+        } else if fragment {
+            proxies.push(&fragment_layer);
+        }
+    }
+    let mut proxies = Box::new(proxies.into_iter().map(|p| &**p).rev());
+
     let mut response = proxies
         .next()
         .ok_or("")?
@@ -111,6 +124,7 @@ pub async fn send_request(
 pub struct RequestConfig {
     pub doh: bool,
     pub fake_host: Option<HostName>,
+    pub fragment: Option<bool>,
 }
 
 impl RequestConfig {
@@ -118,6 +132,7 @@ impl RequestConfig {
         RequestConfig {
             doh: true,
             fake_host: None,
+            fragment: None,
         }
     }
 }

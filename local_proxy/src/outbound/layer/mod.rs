@@ -49,7 +49,7 @@ where
         req_conf: &RequestConfig,
         request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
-        if self.is_http_passthrough() {
+        if self.is_http_passthrough() && scheme == "http" {
             proxies
                 .next()
                 .ok_or("")?

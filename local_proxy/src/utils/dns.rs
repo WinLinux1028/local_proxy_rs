@@ -40,6 +40,10 @@ pub async fn doh_query(mut query: Vec<u8>) -> Result<Vec<u8>, Error> {
         Some(f) => HostName::from_str(f).ok(),
         _ => None,
     };
+    if let Some(1) = &proxy.config.fragment {
+        req_conf.fragment = Some(true)
+    }
+
     let mut response = http_proxy::send_request(request, &req_conf).await?;
     if !response.status().is_success() {
         return Err("".into());

@@ -142,6 +142,7 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
 }
 impl<P> ProxyOutBoundDefaultMethods for P where P: ProxyOutBound + ?Sized {}
 
-pub type ProxyStack<'a> = Box<dyn ClonableIterator<Item = &'a dyn ProxyOutBound> + Send + Sync>;
+pub type ProxyStack<'a> =
+    Box<dyn ClonableIterator<Item = &'a dyn ProxyOutBound> + Send + Sync + 'a>;
 pub trait ClonableIterator: Iterator + DynClone {}
 impl<T: Iterator + DynClone> ClonableIterator for T {}

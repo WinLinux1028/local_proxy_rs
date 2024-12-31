@@ -52,4 +52,4 @@ sudo ip6tables -t nat -A OUTPUT -m udp -p udp --dport 53 -m owner --uid-owner 10
 ## 一部のサイトだけ繋がらない
 このソフトウェアはデフォルトでTLS ClientHelloを断片化して送信することで検閲を回避するように設計されています. <br />
 しかし, 一部のサーバーは断片化されたClientHelloを正しく処理出来ないため, そのようなサーバーに接続する場合はこの機能を無効にする必要があります. <br />
-この機能を無効にするには`config.json5`に`"fragment": false`を追記してください. <br />
+この機能を無効にするには`config.json5`の`fragment`の値を`1`に設定してください. <br />
