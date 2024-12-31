@@ -49,25 +49,24 @@ async fn main() {
                 stdout.flush().unwrap();
                 let mut user = String::new();
                 stdin.read_line(&mut user).unwrap();
-                proxy.user = Some(user);
-            }
-            let user = proxy.user.as_mut().unwrap();
-            *user = user.trim().to_string();
-            if user.is_empty() {
-                proxy.user = None;
+                let user = user.trim_end_matches(['\r', '\n']);
+                proxy.user = Some(user.to_string());
+
+                if proxy.password.is_none() {
+                    write!(&mut stdout, "proxy password> ").unwrap();
+                    stdout.flush().unwrap();
+                    let mut password = String::new();
+                    stdin.read_line(&mut password).unwrap();
+                    let password = password.trim_end_matches(['\r', '\n']);
+                    if !password.is_empty() {
+                        proxy.password = Some(password.to_string());
+                    }
+                }
             }
 
-            if proxy.password.is_none() {
-                write!(&mut stdout, "proxy password> ").unwrap();
-                stdout.flush().unwrap();
-                let mut password = String::new();
-                stdin.read_line(&mut password).unwrap();
-                proxy.password = Some(password.to_string());
-            }
-            let password = proxy.password.as_mut().unwrap();
-            *password = password.trim().to_string();
-            if password.is_empty() {
-                proxy.password = None;
+            let user = proxy.user.as_mut().unwrap();
+            if user.is_empty() {
+                proxy.user = None;
             }
 
             write!(&mut stdout, "\x1B[H\x1B[2J\x1B[3J").unwrap();

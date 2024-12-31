@@ -74,23 +74,6 @@ impl TryFrom<Uri> for ParsedUri {
             port = port_;
         }
 
-        if scheme.is_some() && hostname.is_none() {
-            return Err("".into());
-        }
-        if scheme.is_none() {
-            if user.is_some() {
-                return Err("".into());
-            }
-            if hostname.is_some()
-                && (port.is_none() || (!path.is_empty()) || value.query().is_some())
-            {
-                return Err("".into());
-            }
-            if hostname.is_none() && (path.is_empty()) {
-                return Err("".into());
-            }
-        }
-
         if path.is_empty() {
             path = "/";
         }

@@ -18,18 +18,20 @@ pub struct Socks4Proxy {
 
 impl Socks4Proxy {
     pub fn new(conf: &ProxyConfig) -> Result<Self, Error> {
-        let mut auth = None;
+        let mut auth = String::new();
+
         if let Some(user) = &conf.user {
-            let mut auth_ = user.clone();
-            if let Some(password) = &conf.password {
-                auth_.push(':');
-                auth_.push_str(password);
-            }
-            if auth_.contains('\0') {
-                return Err("".into());
-            }
-            auth = Some(auth_);
+            auth += user;
         }
+        if let Some(password) = &conf.password {
+            auth += ":";
+            auth += password;
+        }
+
+        if auth.contains('\0') {
+            return Err("".into());
+        }
+        let auth = if !auth.is_empty() { Some(auth) } else { None };
 
         Ok(Self {
             addr: SocketAddr::from_str(&conf.server)?,

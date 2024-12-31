@@ -136,10 +136,8 @@ where
             }
         }
 
-        #[allow(unused_assignments)]
         if let State::WaitingMessage { buf, header } = &mut self.state {
             buf.inner.extend_from_slice(buf_write);
-            buf_write = &[];
 
             if buf.inner.len() >= header.len {
                 let mut buf_ = Buffer::new();

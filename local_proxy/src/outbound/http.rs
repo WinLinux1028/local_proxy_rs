@@ -24,15 +24,22 @@ pub struct HttpProxy {
 
 impl HttpProxy {
     pub fn new(conf: &ProxyConfig) -> Result<Self, Error> {
-        let mut auth = None;
+        let mut auth = String::new();
+
         if let Some(user) = &conf.user {
-            let base64 = base64::engine::general_purpose::STANDARD;
-            if let Some(password) = &conf.password {
-                auth = Some(base64.encode(format!("{}:{}", user, password)));
-            } else {
-                auth = Some(base64.encode(format!("{}:", user)))
-            }
+            auth += user;
         }
+        auth += ":";
+        if let Some(password) = &conf.password {
+            auth += password;
+        }
+
+        let auth = if auth.len() > 1 {
+            let base64 = base64::engine::general_purpose::STANDARD;
+            Some(base64.encode(&auth))
+        } else {
+            None
+        };
 
         Ok(Self {
             addr: SocketAddr::from_str(&conf.server)?,

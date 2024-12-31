@@ -22,9 +22,8 @@ impl SocketAddr {
     pub fn parse_host_header(host: &str) -> Result<(HostName, Option<u16>), Error> {
         let hostname;
         let mut port = None;
-        if host.starts_with('[') && host.ends_with(']') {
-            hostname = &host[1..(host.len() - 1)];
-        } else if let Some(host) = host.rsplit_once(':') {
+
+        if let Some(host) = host.rsplit_once(':') {
             hostname = host.0;
             port = Some(host.1.parse()?);
         } else {
@@ -38,14 +37,13 @@ impl SocketAddr {
 
 impl Display for SocketAddr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let hostname = self.hostname.to_string();
         if let HostName::V6(_) = &self.hostname {
             f.write_char('[')?;
-            f.write_str(&hostname)?;
+            f.write_str(&self.hostname.to_string())?;
             f.write_str("]:")?;
             f.write_str(&self.port.to_string())
         } else {
-            f.write_str(&hostname)?;
+            f.write_str(&self.hostname.to_string())?;
             f.write_char(':')?;
             f.write_str(&self.port.to_string())
         }
@@ -55,19 +53,12 @@ impl Display for SocketAddr {
 impl FromStr for SocketAddr {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(addr) = std::net::SocketAddr::from_str(s) {
-            Ok(addr.into())
-        } else {
-            let addr: Vec<&str> = s.split(':').collect();
-            if addr.len() != 2 {
-                return Err("".into());
-            }
+        let (hostname, port) = s.rsplit_once(':').ok_or("")?;
 
-            Ok(Self {
-                hostname: HostName::Domain(addr[0].to_string()),
-                port: addr[1].parse()?,
-            })
-        }
+        Ok(Self {
+            hostname: HostName::from_str(hostname)?,
+            port: port.parse()?,
+        })
     }
 }
 
@@ -167,11 +158,15 @@ impl Display for HostName {
 
 impl FromStr for HostName {
     type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with('[') && s.ends_with(']') {
+            s = &s[1..(s.len() - 1)];
+        }
+
         if let Ok(ip) = std::net::IpAddr::from_str(s) {
             Ok(ip.into())
         } else {
-            Ok(Self::Domain(idna::domain_to_ascii_strict(s)?))
+            Ok(Self::Domain(s.to_string()))
         }
     }
 }

@@ -47,8 +47,6 @@ pub async fn send_request(
         uri.port = port;
     }
 
-    request.headers_mut().remove("x-forwarded-for");
-    request.headers_mut().remove("via");
     let exists_trailers = request.headers().get("te").map(|v| {
         v.to_str().map(|v| {
             v.split(',')
