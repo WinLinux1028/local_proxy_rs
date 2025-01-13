@@ -13,9 +13,8 @@ use crate::{
 };
 
 use async_trait::async_trait;
-use tokio::io::{AsyncRead, AsyncWrite};
-
 use hyper::{Request, Response};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 #[async_trait]
 pub trait Layer: Sync + Send {
@@ -49,7 +48,7 @@ where
         req_conf: &RequestConfig,
         request: Request<Body>,
     ) -> Result<Response<Body>, Error> {
-        if self.is_http_passthrough() {
+        if self.is_http_passthrough() && scheme == "http" {
             proxies
                 .next()
                 .ok_or("")?

@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use super::{ProxyOutBound, ProxyOutBoundDefaultMethods};
 use crate::{
     config::ProxyConfig,
@@ -9,13 +7,13 @@ use crate::{
     Connection, Error,
 };
 
+use async_trait::async_trait;
 use base64::Engine;
 use bytes::Bytes;
 use http_body_util::Empty;
 use hyper::{Method, Request, Response, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
-
-use async_trait::async_trait;
+use std::str::FromStr;
 
 pub struct HttpProxy {
     addr: SocketAddr,
@@ -70,7 +68,8 @@ impl ProxyOutBound for HttpProxy {
             .method(Method::CONNECT)
             .uri(&addr_str)
             .header("host", &addr_str)
-            .header("proxy-connection", "Keep-Alive");
+            .header("connection", "keep-alive")
+            .header("proxy-connection", "keep-alive");
         if let Some(auth) = &self.auth {
             request = request.header("proxy-authorization", format!("Basic {}", auth));
         }
@@ -111,9 +110,6 @@ impl ProxyOutBound for HttpProxy {
             .build()?;
 
         *request.uri_mut() = uri;
-        request
-            .headers_mut()
-            .insert("proxy-connection", "Keep-Alive".parse()?);
         if let Some(auth) = &self.auth {
             request
                 .headers_mut()

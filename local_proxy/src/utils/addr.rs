@@ -1,12 +1,11 @@
 use crate::{utils::doh_query, Error};
 
+use dns_parser::{QueryClass, QueryType, RData};
 use std::{
     fmt::{Display, Write},
     net::{Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };
-
-use dns_parser::{QueryClass, QueryType, RData};
 
 #[derive(Clone)]
 pub struct SocketAddr {

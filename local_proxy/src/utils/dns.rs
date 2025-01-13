@@ -1,5 +1,3 @@
-use std::{str::FromStr, time::Duration};
-
 use super::{Body, HostName};
 use crate::{
     inbound::http::http_proxy::{self, RequestConfig},
@@ -9,6 +7,7 @@ use crate::{
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Uri};
+use std::{str::FromStr, time::Duration};
 
 pub async fn doh_query(mut query: Vec<u8>) -> Result<Vec<u8>, Error> {
     let id = (*query.first().ok_or("")?, *query.get(1).ok_or("")?);
@@ -40,6 +39,10 @@ pub async fn doh_query(mut query: Vec<u8>) -> Result<Vec<u8>, Error> {
         Some(f) => HostName::from_str(f).ok(),
         _ => None,
     };
+    if let Some(1) = &proxy.config.fragment {
+        req_conf.fragment = Some(true)
+    }
+
     let mut response = http_proxy::send_request(request, &req_conf).await?;
     if !response.status().is_success() {
         return Err("".into());

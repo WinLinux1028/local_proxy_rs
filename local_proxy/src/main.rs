@@ -8,14 +8,13 @@ mod utils;
 
 use crate::{config::Config, outbound::ProxyOutBound};
 
+use once_cell::sync::OnceCell;
 use std::io::{Read, Write};
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     sync::RwLock,
 };
 use ttl_cache::TtlCache;
-
-use once_cell::sync::OnceCell;
 
 static ERROR_HTML: &[u8] = include_bytes!("../static/error.html");
 static PROXY: OnceCell<ProxyState> = OnceCell::new();
@@ -90,9 +89,8 @@ async fn main() {
         }
     }
 
-    proxy_stack.push(Box::new(outbound::layer::Fragment::new()));
-    if let Some(false) = config.fragment {
-        proxy_stack.pop();
+    if let Some(2..) | None = config.fragment {
+        proxy_stack.push(Box::new(outbound::layer::Fragment::new()));
     }
 
     let dns_cache = if config.doh.is_some() {

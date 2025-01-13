@@ -6,9 +6,8 @@ use crate::{
     Connection, Error,
 };
 
-use std::str::FromStr;
-
 use async_trait::async_trait;
+use std::str::FromStr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub struct Socks5Proxy {

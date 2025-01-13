@@ -6,9 +6,8 @@ use crate::{
     Connection, Error,
 };
 
-use std::{net::Ipv4Addr, str::FromStr};
-
 use async_trait::async_trait;
+use std::{net::Ipv4Addr, str::FromStr};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub struct Socks4Proxy {

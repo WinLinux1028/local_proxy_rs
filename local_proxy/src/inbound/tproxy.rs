@@ -1,12 +1,8 @@
+use crate::{utils::SocketAddr, Error, PROXY};
+
 use std::time::Duration;
-
-use crate::{
-    utils::{self, SocketAddr},
-    Error, PROXY,
-};
-
 use tokio::{
-    io::{AsyncRead, AsyncWrite},
+    io::{self, AsyncRead, AsyncWrite},
     net::TcpListener,
 };
 use tproxy_tokio::{RedirType, TcpListenerRedirExt, TcpStreamRedirExt};
@@ -50,7 +46,7 @@ pub async fn start() -> Result<(), Error> {
     }
 }
 
-async fn run<RW>(client: RW, redir_type: RedirType) -> Result<(), Error>
+async fn run<RW>(mut client: RW, redir_type: RedirType) -> Result<(), Error>
 where
     RW: AsyncRead + AsyncWrite + TcpStreamRedirExt + Unpin + Send + 'static,
 {
@@ -58,9 +54,9 @@ where
 
     let proxy = PROXY.get().ok_or("")?;
     let mut proxies = Box::new(proxy.proxy_stack.iter().map(|p| &**p).rev());
-    let server_conn = proxies.next().ok_or("")?.connect(proxies, &addr).await?;
+    let mut server_conn = proxies.next().ok_or("")?.connect(proxies, &addr).await?;
 
-    utils::copy_bidirectional(client, server_conn).await;
+    let _ = io::copy_bidirectional(&mut client, &mut server_conn).await;
 
     Ok(())
 }

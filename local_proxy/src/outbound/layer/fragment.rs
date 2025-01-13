@@ -2,7 +2,6 @@ use super::Layer;
 use crate::{utils::SocketAddr, Connection, Error};
 
 use async_trait::async_trait;
-
 use std::{
     future::Future,
     io::ErrorKind,
@@ -71,15 +70,14 @@ where
                 let timer = tokio::time::sleep(Duration::from_secs(1));
                 self.timer = Some(Box::pin(timer));
             }
-        } else {
-            self.timer = None;
-        }
 
-        if let Some(timer) = &mut self.timer {
+            let timer = self.timer.as_mut().unwrap();
             if pin!(timer).poll(cx).is_ready() {
                 self.timer = None;
                 self.state.try_into_raw_send();
             }
+        } else {
+            self.timer = None;
         }
 
         if self.state.is_sending_buffer() {

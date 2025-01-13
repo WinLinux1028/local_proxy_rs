@@ -1,18 +1,19 @@
-mod connect;
 pub mod http_proxy;
 
-use crate::{utils::Body, Error, ERROR_HTML, PROXY};
+mod connect;
 
-use std::time::Duration;
-use tokio::net::TcpListener;
+use crate::{utils::Body, Error, ERROR_HTML, PROXY};
 
 use http_body_util::Full;
 use hyper::{
     body::{Bytes, Incoming},
+    header::HeaderValue,
     service::service_fn,
     Method, Request, Response, StatusCode,
 };
 use hyper_util::rt::TokioIo;
+use std::time::Duration;
+use tokio::net::TcpListener;
 
 pub async fn start() -> Result<(), Error> {
     let listen = PROXY.get().unwrap().config.http_listen.as_ref().ok_or("")?;
@@ -25,7 +26,11 @@ pub async fn start() -> Result<(), Error> {
         tokio::spawn(async move {
             loop {
                 let client = match listener.accept().await {
-                    Ok((o, _)) => TokioIo::new(o),
+                    Ok((o, _)) => o,
+                    Err(_) => continue,
+                };
+                let client = match client.set_nodelay(true) {
+                    Ok(_) => TokioIo::new(client),
                     Err(_) => continue,
                 };
 
@@ -47,16 +52,23 @@ pub async fn start() -> Result<(), Error> {
 async fn handle(request: Request<Incoming>) -> Result<Response<Body>, Error> {
     let request = Body::convert_request(request);
 
-    let mut response = if request.method() == Method::CONNECT {
-        connect::run(request).await
+    let mut response;
+    if request.method() == Method::CONNECT {
+        response = connect::run(request).await;
     } else {
-        http_proxy::run(request).await
+        response = http_proxy::run(request).await;
+        if let Ok(response) = &mut response {
+            response
+                .headers_mut()
+                .insert("connection", HeaderValue::from_static("keep-alive"));
+            response.headers_mut().remove("keep-alive");
+        }
     };
 
     if response.is_err() {
         response = Ok(Response::builder()
             .status(StatusCode::BAD_GATEWAY)
-            .header("connection", "Keep-Alive")
+            .header("connection", "keep-alive")
             .header("content-type", "text/html; charset=utf-8")
             .body(Body::new(Full::new(Bytes::from(ERROR_HTML))))?);
     }

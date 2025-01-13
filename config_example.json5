@@ -18,10 +18,15 @@
         // But SNI and HTTP Host header are set to "endpoint"'s host name.
         // This is useful when the proxy server blocking to access to DoH server.
         // If "endpoint" is set cloudflare-dns.com, you have to set this the host name proxied by Cloudflare.
-        // ex. hakurei.win, tkngh.jp, gazeta-pravda.ru, discord.com, misskey.io, 
+        // ex. hakurei.win, gazeta-pravda.ru, discord.com, misskey.io, 
         "fake_host": "hakurei.win",
     },
-    "fragment": true, // If this is false, the ClientHello will not be sent fragmented.
+
+    // 0: Disable fragmentation
+    // 1: Enable fragmentation for DoH requests only
+    // 2: Enable fragmentation for all requests
+    "fragment": 2, // Default: 2
+    
     "http_listen": ["127.0.0.1:8080", "[::1]:8080"],
     "dns_listen": ["127.0.0.1:8081", "[::1]:8081"],
 

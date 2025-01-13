@@ -1,6 +1,5 @@
-use std::pin::pin;
-
 use hyper::{Request, Response};
+use std::pin::pin;
 
 /// Wrapping [http_body::Body]
 pub struct Body {

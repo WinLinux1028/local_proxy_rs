@@ -5,10 +5,7 @@ mod raw;
 mod socks4;
 mod socks5;
 
-use dns_parser::QueryType;
-use dyn_clone::DynClone;
 pub use http::HttpProxy;
-use hyper_util::rt::TokioIo;
 pub use raw::Raw;
 pub use socks4::Socks4Proxy;
 pub use socks5::Socks5Proxy;
@@ -16,12 +13,16 @@ pub use socks5::Socks5Proxy;
 use crate::{
     inbound::http::http_proxy::RequestConfig,
     outbound::layer::Layer,
-    utils::{self, Body, SocketAddr},
+    utils::{Body, SocketAddr},
     Connection, Error, PROXY,
 };
 
 use async_trait::async_trait;
+use dns_parser::QueryType;
+use dyn_clone::DynClone;
 use hyper::{upgrade::OnUpgrade, Request, Response, StatusCode};
+use hyper_util::rt::TokioIo;
+use tokio::io;
 
 #[async_trait]
 pub trait ProxyOutBound: Send + Sync {
@@ -136,12 +137,16 @@ pub trait ProxyOutBoundDefaultMethods: ProxyOutBound {
 
     async fn proxy_upgrade(client: OnUpgrade, server: OnUpgrade) -> Result<(), Error> {
         let (client, server) = tokio::join!(client, server);
-        utils::copy_bidirectional(TokioIo::new(client?), TokioIo::new(server?)).await;
+        let mut client = TokioIo::new(client?);
+        let mut server = TokioIo::new(server?);
+
+        let _ = io::copy_bidirectional(&mut client, &mut server).await;
         Ok(())
     }
 }
 impl<P> ProxyOutBoundDefaultMethods for P where P: ProxyOutBound + ?Sized {}
 
-pub type ProxyStack<'a> = Box<dyn ClonableIterator<Item = &'a dyn ProxyOutBound> + Send + Sync>;
+pub type ProxyStack<'a> =
+    Box<dyn ClonableIterator<Item = &'a dyn ProxyOutBound> + Send + Sync + 'a>;
 pub trait ClonableIterator: Iterator + DynClone {}
 impl<T: Iterator + DynClone> ClonableIterator for T {}

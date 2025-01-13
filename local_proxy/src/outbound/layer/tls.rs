@@ -1,10 +1,9 @@
 use super::Layer;
 use crate::{utils::SocketAddr, Connection, Error};
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use once_cell::sync::Lazy;
+use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::{rustls, TlsConnector};
 

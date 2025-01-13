@@ -1,9 +1,8 @@
 use super::ProxyOutBound;
 use crate::{outbound::ProxyStack, utils::SocketAddr, Connection, Error};
 
-use tokio::net::TcpStream;
-
 use async_trait::async_trait;
+use tokio::net::TcpStream;
 
 pub struct Raw();
 
