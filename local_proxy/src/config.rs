@@ -2,12 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 #[derive(Serialize, Deserialize)]
-pub struct Config {
+pub struct AppConfig {
     pub proxies: Option<Vec<ProxyConfig>>,
     pub doh: Option<DoHConfig>,
     pub fragment: Option<u8>,
     pub http_listen: Option<Vec<SocketAddr>>,
-    pub tproxy_listen: Option<TProxy>,
+    pub tproxy_listen: Option<TProxyConfig>,
     pub dns_listen: Option<Vec<SocketAddr>>,
 }
 
@@ -26,7 +26,7 @@ pub struct DoHConfig {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct TProxy {
+pub struct TProxyConfig {
     pub listen: Vec<SocketAddr>,
     pub redir_type: Option<String>,
 }
