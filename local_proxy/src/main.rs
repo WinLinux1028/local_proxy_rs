@@ -39,7 +39,7 @@ async fn main() {
             writeln!(
                 &mut stdout,
                 "Configuration of {}://{}",
-                &proxy.protocol, &proxy.server
+                proxy.protocol, proxy.server
             )
             .unwrap();
 
@@ -89,7 +89,7 @@ async fn main() {
         }
     }
 
-    if let Some(2..) | None = config.fragment {
+    if config.fragment >= 2 {
         proxy_stack.push(Box::new(outbound::layer::Fragment::new()));
     }
 

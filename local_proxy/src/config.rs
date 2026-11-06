@@ -1,11 +1,16 @@
 use serde::{Deserialize, Serialize};
+use serde_inline_default::serde_inline_default;
 use std::net::SocketAddr;
 
+#[serde_inline_default]
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub proxies: Option<Vec<ProxyConfig>>,
     pub doh: Option<DoHConfig>,
-    pub fragment: Option<u8>,
+
+    #[serde_inline_default(2)]
+    pub fragment: u8,
+
     pub http_listen: Option<Vec<SocketAddr>>,
     pub tproxy_listen: Option<TProxy>,
     pub dns_listen: Option<Vec<SocketAddr>>,

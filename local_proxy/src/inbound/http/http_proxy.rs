@@ -97,7 +97,7 @@ pub async fn send_request(
     let mut proxies: Vec<&Box<dyn ProxyOutBound>> = proxy.proxy_stack.iter().collect();
     let fragment_layer: Box<dyn ProxyOutBound> = Box::new(Fragment::new());
     if let Some(fragment) = req_conf.fragment {
-        if let Some(2..) | None = proxy.config.fragment {
+        if proxy.config.fragment >= 2 {
             if !fragment {
                 proxies.pop();
             }
