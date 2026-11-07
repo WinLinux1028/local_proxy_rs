@@ -18,7 +18,7 @@
         // But SNI and HTTP Host header are set to "endpoint"'s host name.
         // This is useful when the proxy server blocking to access to DoH server.
         // If "endpoint" is set cloudflare-dns.com, you have to set this the host name proxied by Cloudflare.
-        // ex. hakurei.win, gazeta-pravda.ru, discord.com, misskey.io, 
+        // ex. hakurei.win, x.com, discord.com, misskey.io, ...
         "fake_host": "hakurei.win",
     },
 
