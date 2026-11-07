@@ -17,7 +17,7 @@ pub async fn send_request(
 ) -> Result<Response<Body>, Error> {
     let mut uri: ParsedUri = request.uri().clone().try_into()?;
 
-    if let Some(scheme) = uri.scheme() {
+    if let Some(scheme) = uri.scheme.as_deref() {
         match scheme {
             "http" => (),
             "https" => (),
@@ -25,18 +25,16 @@ pub async fn send_request(
         }
 
         if request.headers().get("authorization").is_none() {
-            if let Some(user) = uri.user() {
+            if let Some(user) = &uri.user {
                 let base64 = base64::engine::general_purpose::STANDARD;
-                let mut auth_ = "Basic ".to_string();
-                if let Some(password) = uri.password() {
-                    auth_.push_str(&base64.encode(format!("{}:{}", user, password)));
-                } else {
-                    auth_.push_str(&base64.encode(format!("{}:", user)));
+                let mut auth = user.clone();
+                auth.push(b':');
+                if let Some(password) = &uri.password {
+                    auth.extend_from_slice(password);
                 }
+                let auth = format!("Basic {}", base64.encode(&auth));
 
-                request
-                    .headers_mut()
-                    .insert("authorization", auth_.parse()?);
+                request.headers_mut().insert("authorization", auth.parse()?);
             }
         }
     } else {
@@ -72,8 +70,8 @@ pub async fn send_request(
         request.headers_mut().remove(i);
     }
 
-    let scheme = uri.scheme().ok_or("")?.to_string();
-    let hostname = uri.hostname().ok_or("")?;
+    let scheme = uri.scheme.as_deref().ok_or("")?;
+    let hostname = uri.hostname.as_ref().ok_or("")?;
     let mut host_header = hostname.to_string_url_style();
     if let Some(port) = uri.port {
         if (scheme == "http" && port == 80) || (scheme == "https" && port == 443) {
@@ -85,6 +83,7 @@ pub async fn send_request(
     }
     request.headers_mut().insert("host", host_header.parse()?);
 
+    let scheme = uri.scheme.ok_or("")?;
     uri.scheme = None;
     uri.user = None;
     uri.password = None;
