@@ -39,7 +39,7 @@ pub async fn doh_query(mut query: Vec<u8>) -> Result<Vec<u8>, Error> {
         Some(f) => HostName::from_str(f).ok(),
         _ => None,
     };
-    if let Some(1) = &proxy.config.fragment {
+    if proxy.config.fragment >= 1 {
         req_conf.fragment = Some(true)
     }
 
